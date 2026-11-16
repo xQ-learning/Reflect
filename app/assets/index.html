@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Reflect · 复盘</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 顶栏：标题 / 返回 / 项目状态 -->
+  <header id="appbar" class="appbar"></header>
+
+  <!-- 主视图容器：由 ui.js 全量重绘 -->
+  <main id="view" class="view"></main>
+
+  <!-- 底部 Tab 栏（项目内横向滚动） -->
+  <nav id="tabbar" class="tabbar" aria-label="主导航"></nav>
+
+  <!-- 弹层容器：向导 / 修订 / 关闭改进 / confirm -->
+  <div id="modal-root"></div>
+
+  <!-- Toast 容器 -->
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <!-- 经典脚本顺序加载：file:// 下禁用 ES module -->
+  <script src="js/store.js"></script>
+  <script src="js/compare.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/wizard.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
