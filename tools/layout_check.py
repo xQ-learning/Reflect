@@ -100,6 +100,11 @@ def run(d):
         ("#/project/demo-prev-template/causes", "原因与改进"),
         ("#/project/demo-prev-template/compare", "对比"),
         ("#/project/demo-prev-template/export", "导出"),
+        # 当前示例项目数据更全，用来压两栏布局（目标/标准、事实/关键事实）
+        ("#/project/demo-current-clip/goal", "目标(全量)"),
+        ("#/project/demo-current-clip/facts", "事实(全量)"),
+        ("#/project/demo-current-clip/causes", "原因与改进(全量)"),
+        ("#/project/demo-current-clip/compare", "对比(全量)"),
     ]
     print("\n[布局] 模拟 360px 手机视口 (zoom=%.2f)" % ZOOM)
     for hash_, label in routes:

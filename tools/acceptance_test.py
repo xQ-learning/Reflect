@@ -3,10 +3,11 @@
 验收：
   A. 模糊愿望（"我要很爽"）能通过向导引导出至少一个带阈值的验证标准
   B. 目标修改可追溯（版本链），报告展示原目标与修正目标
-  C. 改进未验证不能关闭；历史对比能高亮重复问题
+  C. 改进没有验证结论不能闭环（验证可延后补录）；历史对比能高亮重复问题
 另加：
   D. 无外部网络请求 / 无 ES module import
   E. 控制台无 JS 报错
+  F. 板块精简：目标两栏、结果无提交人、事实两栏、改进只留措施栏
 """
 import os
 import re
@@ -249,35 +250,41 @@ def run(d):
     check("报告有原目标与修正目标对照段", rev["mdHasSection"], str(rev))
     check("报告标注已修正", rev["mdHasMarked"], str(rev))
 
-    # ---------- C. 改进未验证不能关闭 ----------
-    print("\n[C] 改进未验证不能关闭")
+    # ---------- C. 改进没验证结论就不能闭环（验证可延后补录） ----------
+    print("\n[C] 改进闭环必须留验证结论")
     close_guard = d.execute("""
       var ps = window.Reflect.store.getProjects();
       var p = ps[0];
-      var a = window.Reflect.store.addAction(p.id, {title:'优化模板入口', owner:'张三', due:'2026-12-01'});
+      // 验证可以先不填：改进措施先记下来
+      var a = window.Reflect.store.addAction(p.id, {title:'优化模板入口'});
+      var act0 = null;
+      window.Reflect.store.getState().projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act0=x; }); });
       var res = window.Reflect.store.closeAction(a.id, '');
-      var state = window.Reflect.store.getState();
       var act = null;
-      state.projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act=x; }); });
-      return {ok: res.ok, error: res.error || '', status: act ? act.status : null,
-              hasVerifyMetric: !!(act && act.verifyMetric)};
+      window.Reflect.store.getState().projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act=x; }); });
+      return {created: !!a, status0: act0 ? act0.status : null,
+              hasVerifyMetric: !!(act0 && act0.verifyMetric),
+              ok: res.ok, error: res.error || '', status: act ? act.status : null};
     """)
-    check("缺少验证指标时拒绝关闭", close_guard["ok"] is False, str(close_guard))
+    check("改进措施可以先不填验证直接记下", close_guard["created"] and close_guard["status0"] == "open",
+          str(close_guard))
+    check("缺少验证结论时拒绝闭环", close_guard["ok"] is False, str(close_guard))
     check("拒绝时给出错误说明", bool(close_guard["error"]), str(close_guard))
-    check("状态未被改成已关闭", close_guard["status"] != "verified", str(close_guard))
+    check("状态未被改成已闭环", close_guard["status"] != "verified", str(close_guard))
 
     close_ok = d.execute("""
-      var state = window.Reflect.store.getState();
-      var p = state.projects[0];
-      var a = p.actions[p.actions.length-1];
-      window.Reflect.store.updateAction(a.id, {verifyMetric:'完成率'});
-      var res = window.Reflect.store.closeAction(a.id, '完成率从 40% 升到 75%');
       var st = window.Reflect.store.getState();
+      var p = st.projects[0];
+      var a = p.actions[p.actions.length-1];
+      // 事后补录验证结论即可闭环，验证指标可选
+      var res = window.Reflect.store.closeAction(a.id, '完成率从 40% 升到 75%');
       var act=null;
-      st.projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act=x; }); });
-      return {ok: res.ok, status: act.status, result: act.verifyResult};
+      window.Reflect.store.getState().projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act=x; }); });
+      return {ok: res.ok, status: act.status, result: act.verifyResult, metric: act.verifyMetric};
     """)
-    check("补齐验证信息后可关闭", close_ok["ok"] is True and close_ok["status"] == "verified", str(close_ok))
+    check("补录验证结论后可闭环", close_ok["ok"] is True and close_ok["status"] == "verified", str(close_ok))
+    check("闭环时验证结论被记录", bool(close_ok["result"]), str(close_ok))
+    check("验证指标是可选的", close_ok["metric"] == "", str(close_ok))
 
     # ---------- D. 历史对比高亮重复原因 ----------
     print("\n[D] 历史对比高亮重复问题")
@@ -288,9 +295,9 @@ def run(d):
       window.Reflect.store.addCause(other.id, {layer:'执行', text:'新手找不到模板入口', factIds:[]});
       window.Reflect.store.addCause(other.id, {layer:'执行', text:'导出流程太慢导致失败率高', factIds:[]});
       // 历史复盘里的改进项：一已验证、一未验证（未生效）
-      var a1 = window.Reflect.store.addAction(other.id, {title:'优化模板入口', owner:'张三', verifyMetric:'完成率'});
+      var a1 = window.Reflect.store.addAction(other.id, {title:'优化模板入口'});
       window.Reflect.store.closeAction(a1.id, '完成率升到 80%');
-      window.Reflect.store.addAction(other.id, {title:'加一个导出进度条', owner:'李四', verifyMetric:'导出失败率'});
+      window.Reflect.store.addAction(other.id, {title:'加一个导出进度条'});
       var o = window.Reflect.store.getProject(other.id);
       window.Reflect.store.addCause(p.id, {layer:'执行', text:'新手找不到模板入口', factIds:[]});
       window.Reflect.store.addCause(p.id, {layer:'资源', text:'缺少预设模板', factIds:[]});
@@ -308,8 +315,8 @@ def run(d):
     check("重复原因文本正确配对",
           cmp_res["repPair"] and "模板入口" in cmp_res["repPair"][0] and "模板入口" in cmp_res["repPair"][1],
           str(cmp_res["repPair"]))
-    check("识别未生效改进", cmp_res["ineffCount"] == 1, str(cmp_res))
-    check("未生效改进只含未验证项",
+    check("识别上次没闭环的改进", cmp_res["ineffCount"] == 1, str(cmp_res))
+    check("没闭环的改进只含未闭环项",
           cmp_res["ineffTitles"] == ["加一个导出进度条"], str(cmp_res["ineffTitles"]))
     check("compareProjects 返回完整结构",
           "repeatedCauses" in cmp_res["fullKeys"] and "ineffectiveActions" in cmp_res["fullKeys"],
@@ -326,7 +333,7 @@ def run(d):
     check("Markdown 报告非空", exp["mdLen"] > 200, str(exp["mdLen"]))
     check("报告含目标/结果/事实/原因/改进各段",
           all(k in exp["md"] for k in ["目标", "结果", "事实", "原因", "改进"]))
-    check("报告标注未验证改进", "未验证" in exp["md"], "")
+    check("报告标注尚未闭环的改进", "尚未闭环" in exp["md"], "")
     check("摘要非空", exp["smLen"] > 20, str(exp["smLen"]))
     open(os.path.join(SHOTS, "report-sample.md"), "w", encoding="utf-8").write(exp["md"])
 
@@ -347,6 +354,151 @@ def run(d):
         d.screenshot(os.path.join(SHOTS, shot))
         body_len = d.execute("return document.body ? document.body.innerText.trim().length : 0")
         check("页面 %s 有内容渲染" % hash_, body_len > 10, "len=%d" % body_len)
+
+    # ---------- F. 板块精简 ----------
+    print("\n[F] 板块精简")
+
+    # 目标：两栏「目标 | 可验证的标准」
+    d.execute("location.hash = '#/project/%s/goal';" % exp_id(d))
+    time.sleep(0.5)
+    goal = d.execute("""
+      var view = document.getElementById('view') || document.body;
+      var cols = view.querySelectorAll('.cols');
+      var heads = [];
+      if (cols.length) {
+        var hs = cols[0].querySelectorAll('.col-h');
+        for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
+      }
+      return {colCount: cols.length, heads: heads,
+              hasLayers: view.textContent.indexOf('第 1 层') >= 0 || view.textContent.indexOf('三层') >= 0,
+              hasCriteria: view.textContent.indexOf('可验证的标准') >= 0};
+    """)
+    check("目标为两栏布局", goal["colCount"] == 1, str(goal))
+    check("目标两栏分别是「目标」与「可验证的标准」",
+          goal["heads"][:2] == ["目标", "可验证的标准"], str(goal["heads"]))
+    check("目标不再展示「三层」结构", not goal["hasLayers"], str(goal))
+    check("目标展示可验证的标准", goal["hasCriteria"], str(goal))
+
+    # 结果：没有提交人
+    d.execute("location.hash = '#/project/%s/result';" % exp_id(d))
+    time.sleep(0.5)
+    result = d.execute("""
+      var view = document.getElementById('view') || document.body;
+      return {hasAuthorField: !!view.querySelector('#r-author'),
+              hasAuthorText: view.textContent.indexOf('提交人') >= 0,
+              hasActual: !!view.querySelector('#r-actual'),
+              hasGap: !!view.querySelector('#r-gap')};
+    """)
+    check("结果板块无提交人输入框", not result["hasAuthorField"], str(result))
+    check("结果板块不出现「提交人」字样", not result["hasAuthorText"], str(result))
+    check("结果板块保留实际结果与目标差距",
+          result["hasActual"] and result["hasGap"], str(result))
+
+    # 事实：两栏「事实 | 关键事实」，时间线保留，其余字段去掉
+    d.execute("location.hash = '#/project/%s/facts';" % exp_id(d))
+    time.sleep(0.5)
+    facts = d.execute("""
+      var view = document.getElementById('view') || document.body;
+      var cols = view.querySelectorAll('.cols');
+      var heads = [];
+      if (cols.length) {
+        var hs = cols[0].querySelectorAll('.col-h');
+        for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
+      }
+      var txt = view.textContent;
+      return {colCount: cols.length, heads: heads,
+              hasTimeline: !!view.querySelector('.timeline'),
+              hasKind: !!view.querySelector('#f-kind'), hasSource: !!view.querySelector('#f-source'),
+              hasEvidence: !!view.querySelector('#f-evidence'), hasConf: !!view.querySelector('#f-conf'),
+              hasStatus: !!view.querySelector('#f-status'), hasAuthor: !!view.querySelector('#f-author'),
+              hasContent: !!view.querySelector('#f-content'),
+              mentionsType: txt.indexOf('类型') >= 0,
+              mentionsConfidence: txt.indexOf('置信度') >= 0,
+              mentionsStatus: txt.indexOf('待验证') >= 0,
+              mentionsEvidence: txt.indexOf('证据') >= 0,
+              mentionsSource: txt.indexOf('来源') >= 0};
+    """)
+    check("事实为两栏布局", facts["colCount"] == 1, str(facts))
+    check("事实两栏分别是「事实」与「关键事实」",
+          len(facts["heads"]) >= 2 and facts["heads"][0].startswith("事实")
+          and facts["heads"][1].startswith("关键事实"), str(facts["heads"]))
+    check("事实保留时间线", facts["hasTimeline"], str(facts))
+    check("事实只保留内容与时间点输入",
+          facts["hasContent"] and not facts["hasKind"] and not facts["hasSource"]
+          and not facts["hasEvidence"] and not facts["hasConf"] and not facts["hasStatus"]
+          and not facts["hasAuthor"], str(facts))
+    check("事实不再出现类型/置信度/状态/证据/来源",
+          not facts["mentionsType"] and not facts["mentionsConfidence"]
+          and not facts["mentionsStatus"] and not facts["mentionsEvidence"]
+          and not facts["mentionsSource"], str(facts))
+
+    # 标为关键 → 关键事实栏出现
+    d.execute("window.Reflect.store.seedExample(); return true;")
+    time.sleep(0.4)
+    d.execute("location.hash = '#/project/demo-current-clip/facts'; return true;")
+    time.sleep(0.5)
+    keyflow = d.execute("""
+      var view = document.getElementById('view') || document.body;
+      var cols = view.querySelectorAll('.cols');
+      function colItems(n){
+        var c = cols[0].querySelectorAll('.col')[n];
+        return c ? c.querySelectorAll('.fact-item').length : -1;
+      }
+      var before = colItems(1);
+      var btn = view.querySelector('[data-act=toggle-key-fact]');
+      if (!btn) return {noBtn: true, before: before};
+      btn.click();
+      return {noBtn: false, before: before};
+    """)
+    time.sleep(0.5)
+    keyafter = d.execute("""
+      var view = document.getElementById('view') || document.body;
+      var cols = view.querySelectorAll('.cols');
+      var c = cols[0].querySelectorAll('.col')[1];
+      return c ? c.querySelectorAll('.fact-item').length : -1;
+    """)
+    check("事实面板有「标为关键」入口", not keyflow.get("noBtn"), str(keyflow))
+    check("标为关键后进入关键事实栏", keyafter != keyflow.get("before"), str((keyflow, keyafter)))
+
+    # 原因与改进：改进板块只保留改进措施
+    d.execute("location.hash = '#/project/demo-current-clip/causes'; return true;")
+    time.sleep(0.5)
+    causes = d.execute("""
+      var view = document.getElementById('view') || document.body;
+      return {hasTitle: !!view.querySelector('#a-title'),
+              hasOwner: !!view.querySelector('#a-owner'), hasDue: !!view.querySelector('#a-due'),
+              hasMetric: !!view.querySelector('#a-metric'), hasCauseSel: !!view.querySelector('#a-cause'),
+              mentionsOwner: view.textContent.indexOf('负责人') >= 0,
+              mentionsDue: view.textContent.indexOf('截止') >= 0,
+              mentionsVerifyMetric: view.textContent.indexOf('验证指标') >= 0};
+    """)
+    check("改进只保留改进措施输入", causes["hasTitle"], str(causes))
+    check("改进去掉负责人/截止/验证指标/关联原因",
+          not causes["hasOwner"] and not causes["hasDue"] and not causes["hasMetric"]
+          and not causes["hasCauseSel"], str(causes))
+    check("改进面板不再出现负责人/截止/验证指标",
+          not causes["mentionsOwner"] and not causes["mentionsDue"]
+          and not causes["mentionsVerifyMetric"], str(causes))
+
+    # 验证延后：改进列表里可以直接补录验证
+    d.execute("""
+      var p = window.Reflect.store.getProject('demo-current-clip');
+      window.Reflect.store.addAction(p.id, {title:'改进措施可先记下'});
+      return true;
+    """)
+    time.sleep(0.4)
+    d.execute("location.hash = '#/project/demo-current-clip/causes'; return true;")
+    time.sleep(0.5)
+    defer = d.execute("""
+      var view = document.getElementById('view') || document.body;
+      var btns = view.querySelectorAll('[data-act=act-close]');
+      return {closeBtns: btns.length,
+              text: btns.length ? btns[0].textContent.trim() : '',
+              hasFailed: !!view.querySelector('[data-act=act-failed]')};
+    """)
+    check("改进清单有「补录验证」入口", defer["closeBtns"] >= 1, str(defer))
+    check("补录验证按钮文案正确", defer["text"] == "补录验证", str(defer))
+    check("改进清单有「未生效」入口", defer["hasFailed"], str(defer))
 
     # ---------- 控制台错误 ----------
     print("\n[E] 控制台")

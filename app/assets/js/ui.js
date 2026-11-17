@@ -18,14 +18,12 @@
   ];
 
   var FLOW_STEPS = [
-    '发起', '翻译愿望为验证标准', '独立提交结果/事实', '合并时间线',
-    '归因', '改进', '验证', '下次对比'
+    '发起', '翻译愿望', '记结果', '记事实',
+    '归因', '改进', '闭环', '下次对比'
   ];
 
   var route = { view: 'projects', id: null, tab: 'goal' };
-  var selectedFacts = {};        // 事实多选：id -> true
   var selectedCompare = {};      // 对比项目多选：id -> true
-  var factMergeMain = null;      // 合并主线事实 id
   var lastMarkdown = '';
   var lastSummary = '';
 
@@ -203,7 +201,7 @@
       bar.innerHTML =
         '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#4d8dfa" stroke-width="1.8" stroke-linecap="round">' +
         '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>' +
-        '<div class="title">Reflect <span class="sub">目标—结果差距复盘</span></div>';
+        '<div class="title">Reflect <span class="sub">把差距变成下一次的动作</span></div>';
       return;
     }
     var p = store.getProject(route.id);
@@ -314,9 +312,10 @@
     var versions = store.getGoalVersions(project.id);
 
     h += '<div class="card">' +
-      '<div class="row between"><h2 style="margin:0">目标三层</h2>' +
+      '<div class="row between wrap" style="margin-bottom:4px">' +
+      '<h2 style="margin:0">目标</h2>' +
       '<div class="row">' +
-      '<button class="btn primary sm" data-act="wizard">翻译愿望为验证标准</button>' +
+      '<button class="btn primary sm" data-act="wizard">翻译愿望</button>' +
       '<button class="btn sm" data-act="revise">生成修订版本</button>' +
       '</div></div>';
 
@@ -328,20 +327,26 @@
       return h;
     }
 
-    h += '<div class="sub-card" style="margin-top:10px">' +
-      '<div class="muted small">第 1 层 · 原始愿望</div>' +
-      '<div>' + esc(cur.originalWish || '（未填写）') + '</div></div>';
-    h += '<div class="sub-card">' +
-      '<div class="muted small">依据</div><div>' + esc(cur.basis || '（未填写）') + '</div></div>';
-    h += '<div class="sub-card">' +
-      '<div class="muted small">第 2 层 · 场景假设</div>' +
-      '<div>' + esc(cur.scenarioHypothesis || '（未填写）') + '</div></div>';
-    h += '<div class="sub-card">' +
-      '<div class="muted small">第 3 层 · 本次验证标准</div>';
+    // 两栏：目标 | 可验证的标准
+    h += '<div class="cols">';
+
+    h += '<div class="col">' +
+      '<div class="col-h">目标</div>' +
+      '<div class="col-body">' + esc(cur.originalWish || '（未填写）') + '</div>';
+    if (cur.scenarioHypothesis) {
+      h += '<div class="col-sub">场景</div><div class="col-body">' + esc(cur.scenarioHypothesis) + '</div>';
+    }
+    if (cur.basis) {
+      h += '<div class="col-sub">依据</div><div class="col-body">' + esc(cur.basis) + '</div>';
+    }
+    h += '</div>';
+
+    h += '<div class="col">' +
+      '<div class="col-h">可验证的标准</div>';
     if (cur.verificationCriteria && cur.verificationCriteria.length) {
       for (var i = 0; i < cur.verificationCriteria.length; i++) {
         var c = cur.verificationCriteria[i];
-        h += '<div style="margin-top:6px">· ' + esc(c.text) +
+        h += '<div class="col-body" style="margin-top:6px">· ' + esc(c.text) +
           (c.metric ? ' <span class="badge">' + esc(c.metric) + '</span>' : '') +
           (c.threshold ? ' <span class="badge running">' + esc(c.threshold) + '</span>' : '') +
           '</div>';
@@ -349,9 +354,13 @@
     } else {
       h += '<div class="badge alert">尚无验证标准</div>';
     }
+    if (cur.adjustmentRule) {
+      h += '<div class="col-sub">调整规则</div><div class="col-body">' + esc(cur.adjustmentRule) + '</div>';
+    }
     h += '</div>';
-    h += '<div class="sub-card"><div class="muted small">调整规则（满足什么条件就修正目标）</div>' +
-      '<div>' + esc(cur.adjustmentRule || '（未填写）') + '</div></div>';
+
+    h += '</div>';
+
     if (cur.note) {
       h += '<div class="sub-card"><div class="muted small">本次修订说明</div><div>' + esc(cur.note) + '</div></div>';
     }
@@ -370,7 +379,7 @@
           '<div class="row between"><span class="item-t">v' + gv.version +
           (isCur ? ' <span class="badge running">当前</span>' : ' <span class="badge revised">已修正</span>') +
           '</span><span class="muted small">' + fmtTime(gv.createdAt) + '</span></div>' +
-          '<div class="kv"><b>愿望：</b>' + esc(gv.originalWish) + '</div>' +
+          '<div class="kv"><b>目标：</b>' + esc(gv.originalWish) + '</div>' +
           '<div class="kv"><b>场景：</b>' + esc(gv.scenarioHypothesis) + '</div>' +
           '<div class="kv"><b>标准：</b>' + esc(gv.verificationCriteria.map(function (x) { return x.text; }).join('；') || '（无）') + '</div>' +
           (gv.note ? '<div class="kv"><b>说明：</b>' + esc(gv.note) + '</div>' : '') +
@@ -385,15 +394,13 @@
   // ---------- 结果 Tab ----------
   function renderResult(project) {
     var h = '';
-    h += '<div class="card"><h2>独立提交结果</h2>' +
-      '<div class="hint">多人可各自提交一条结果；最终以最新一条为准。</div>' +
+    h += '<div class="card"><h2>结果</h2>' +
       '<label class="field" style="margin-top:10px"><span>实际结果</span>' +
       '<textarea id="r-actual" placeholder="例：5 人中 3 人完成，导出失败率 12%"></textarea></label>' +
       '<div id="r-metrics"></div>' +
       '<button class="btn sm" data-act="add-metric" style="margin-bottom:10px">+ 添加关键指标</button>' +
       '<label class="field"><span>目标差距</span>' +
       '<textarea id="r-gap" placeholder="例：完成率差 20 个百分点"></textarea></label>' +
-      '<label class="field"><span>提交人</span><input type="text" id="r-author" placeholder="姓名"></label>' +
       '<button class="btn primary block" data-act="add-result">提交结果</button></div>';
 
     if (!project.results.length) {
@@ -407,7 +414,7 @@
       var latest = i === project.results.length - 1;
       h += '<div class="item">' +
         '<div class="row between"><span class="item-t">' + (latest ? '最新提交' : '历史提交') + '</span>' +
-        '<span class="muted small">' + fmtTime(r.createdAt) + ' · ' + esc(r.author || '未署名') + '</span></div>' +
+        '<span class="muted small">' + fmtTime(r.createdAt) + '</span></div>' +
         '<div class="kv" style="white-space:pre-wrap">' + esc(r.actual || '（未填写）') + '</div>';
       if (r.metrics && r.metrics.length) {
         h += '<table class="tbl" style="margin-top:8px"><tr><th>指标</th><th>实际</th><th>目标</th></tr>';
@@ -419,13 +426,13 @@
       if (r.gap) h += '<div class="kv"><b>目标差距：</b>' + esc(r.gap) + '</div>';
       if (!latest) {
         h += '<div class="row end" style="margin-top:8px">' +
-          '<button class="btn sm" data-act="merge-result" data-id="' + esc(r.id) + '">以我的提交为准</button></div>';
+          '<button class="btn sm" data-act="merge-result" data-id="' + esc(r.id) + '">以此条为准</button></div>';
       }
       h += '</div>';
     }
     if (project.results.length > 1) {
-      h += '<div class="alert-box">存在 ' + project.results.length + ' 条独立提交。导出报告以最新一条为准；' +
-        '若需以其它提交为准，点对应记录上的「以我的提交为准」。</div>';
+      h += '<div class="alert-box">存在 ' + project.results.length + ' 条提交。导出报告以最新一条为准；' +
+        '若需以其它提交为准，点对应记录上的「以此条为准」。</div>';
     }
     return h;
   }
@@ -433,95 +440,73 @@
   // ---------- 事实 Tab ----------
   function renderFacts(project) {
     var h = '';
-    h += '<div class="card"><h2>独立提交事实</h2>' +
-      '<div class="hint">事实 / 判断 / 情绪分开记录；多人独立提交后可合并为一条主线事实，来源全部保留。</div>' +
-      '<div style="margin-top:10px">' +
-      '<label class="field"><span>类型</span><select id="f-kind">' +
-      '<option value="fact">事实（可观测）</option>' +
-      '<option value="judgment">判断（推断）</option>' +
-      '<option value="emotion">情绪（感受）</option></select></label>' +
-      '<label class="field"><span>内容</span><textarea id="f-content" placeholder="例：用户在模板入口停留超过 40 秒后退出"></textarea></label>' +
+    var all = project.facts.slice();
+    var mains = all.filter(function (f) { return !f.mergedInto; });
+    var keys = mains.filter(function (f) { return f.key; });
+
+    // 提交
+    h += '<div class="card"><h2>记一条事实</h2>' +
+      '<label class="field" style="margin-top:10px"><span>发生了什么</span>' +
+      '<textarea id="f-content" placeholder="例：用户在模板入口停留超过 40 秒后退出"></textarea></label>' +
       '<label class="field"><span>时间点</span><input type="text" id="f-time" value="' + esc(nowLocalInput()) + '" placeholder="2026-11-16 14:30"></label>' +
-      '<label class="field"><span>来源（谁 / 哪次观察）</span><input type="text" id="f-source" placeholder="例：李四（用户测试）"></label>' +
-      '<label class="field"><span>证据（录屏 / 访谈 / 数据）</span><input type="text" id="f-evidence" placeholder="例：录屏 R-03"></label>' +
-      '<div class="inline-2">' +
-      '<label class="field"><span>置信度</span><select id="f-conf">' +
-      '<option value="low">低</option><option value="medium" selected>中</option><option value="high">高</option>' +
-      '</select></label>' +
-      '<label class="field"><span>状态</span><select id="f-status">' +
-      '<option value="pending">待验证</option><option value="verified">已验证</option><option value="disputed">有争议</option>' +
-      '</select></label>' +
-      '</div>' +
-      '<label class="field"><span>提交人</span><input type="text" id="f-author" placeholder="姓名"></label>' +
-      '<button class="btn primary block" data-act="add-fact">提交事实</button>' +
-      '</div></div>';
+      '<button class="btn primary block" data-act="add-fact">记下来</button></div>';
 
-    var mains = project.facts.filter(function (f) { return !f.mergedInto; });
-    mains.sort(function (a, b) { return String(a.timelineAt || '').localeCompare(String(b.timelineAt || '')); });
+    // 两栏：事实 | 关键事实
+    h += '<div class="cols">';
 
+    h += '<div class="col"><div class="col-h">事实（' + mains.length + '）</div>';
     if (!mains.length) {
-      h += '<div class="empty"><div class="e-t">还没有事实</div><div>记录发生了什么，注明来源与证据。</div></div>';
+      h += '<div class="muted small">还没有事实</div>';
+    }
+    for (var i = 0; i < mains.length; i++) {
+      var f = mains[i];
+      h += '<div class="fact-item">' +
+        '<div class="row between" style="align-items:flex-start">' +
+        '<span class="grow">' + esc(f.content) + '</span>' +
+        '<button class="btn sm ' + (f.key ? 'ok' : 'ghost') + '" data-act="toggle-key-fact" data-id="' + esc(f.id) + '">' +
+        (f.key ? '取消关键' : '标为关键') + '</button>' +
+        '</div>' +
+        '<div class="muted small" style="margin-top:4px">' + esc(f.timelineAt || '未标时间') + '</div>' +
+        '</div>';
+    }
+    h += '</div>';
+
+    h += '<div class="col"><div class="col-h">关键事实（' + keys.length + '）</div>';
+    if (!keys.length) {
+      h += '<div class="muted small">把真正影响结论的几条标出来，这里会单独汇总。</div>';
+    }
+    for (var k = 0; k < keys.length; k++) {
+      var kf = keys[k];
+      h += '<div class="fact-item key">' +
+        '<div>' + esc(kf.content) + '</div>' +
+        '<div class="muted small" style="margin-top:4px">' + esc(kf.timelineAt || '未标时间') + '</div>' +
+        '</div>';
+    }
+    h += '</div>';
+
+    h += '</div>';
+
+    // 时间线
+    if (!mains.length) {
+      h += '<div class="empty"><div class="e-t">还没有事实</div><div>记下发生了什么，标出关键的那几条。</div></div>';
       return h;
     }
 
-    h += '<h1 class="page-title">时间线（' + mains.length + '）</h1>';
-    var picked = 0;
-    for (var i = 0; i < mains.length; i++) { if (selectedFacts[mains[i].id]) picked++; }
+    var ordered = mains.slice().sort(function (a, b) {
+      return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
+    });
 
-    if (mains.length > 1) {
-      h += '<div class="card" style="padding:12px 14px">' +
-        '<div class="row between"><span class="small">已选 <b>' + picked + '</b> 条</span>' +
-        '<div class="row">' +
-        '<button class="btn sm" data-act="pick-all-facts">全选</button>' +
-        '<button class="btn sm" data-act="clear-facts">清空</button>' +
-        '<button class="btn primary sm" data-act="merge-facts"' + (picked < 2 ? ' disabled' : '') + '>合并为一条主线</button>' +
-        '</div></div>' +
-        '<div class="hint" style="margin-top:8px">合并时选择其中一条作为主线，其余条目内容会作为「独立提交来源」保留在主线事实下。</div>' +
-        '<label class="field" style="margin-top:10px"><span>主线事实</span><select id="merge-main">' +
-        '<option value="">（选择一条作为主线）</option>';
-      for (var mi = 0; mi < mains.length; mi++) {
-        if (!selectedFacts[mains[mi].id]) continue;
-        h += '<option value="' + esc(mains[mi].id) + '"' + (factMergeMain === mains[mi].id ? ' selected' : '') + '>' +
-          esc(String(mains[mi].timelineAt || '').slice(5) + ' · ' + mains[mi].content.slice(0, 24)) + '</option>';
-      }
-      h += '</select></label></div>';
-    }
-
+    h += '<h1 class="page-title">时间线（' + ordered.length + '）</h1>';
     h += '<div class="timeline">';
-    for (var k = 0; k < mains.length; k++) {
-      var f = mains[k];
-      var kindCls = f.kind === 'judgment' ? 'judgment' : (f.kind === 'emotion' ? 'emotion' : 'fact');
-      var kindTxt = f.kind === 'judgment' ? '判断' : (f.kind === 'emotion' ? '情绪' : '事实');
+    for (var t = 0; t < ordered.length; t++) {
+      var tf = ordered[t];
       h += '<div class="tl-item">' +
-        '<div class="tl-time">' + esc(f.timelineAt || '未标时间') + ' · ' + esc(f.author || '未署名') + '</div>' +
-        '<div class="tl-body">' +
-        '<div class="row between" style="align-items:flex-start">' +
-        '<span class="grow"><span class="badge ' + kindCls + '">' + kindTxt + '</span> ' +
-        '<span class="badge ' + f.confidence + '">置信度' + (f.confidence === 'high' ? '高' : f.confidence === 'low' ? '低' : '中') + '</span> ' +
-        '<span class="badge ' + f.status + '">' + (f.status === 'verified' ? '已验证' : f.status === 'disputed' ? '有争议' : '待验证') + '</span></span>' +
-        '<label class="sel-wrap"><input type="checkbox" class="sel-box" data-act="pick-fact" data-id="' + esc(f.id) + '"' +
-        (selectedFacts[f.id] ? ' checked' : '') + '></label>' +
-        '</div>' +
-        '<div style="margin-top:6px;white-space:pre-wrap">' + esc(f.content) + '</div>' +
-        '<div class="kv"><b>来源：</b>' + esc(f.source || '（未填写）') + '</div>' +
-        '<div class="kv"><b>证据：</b>' + esc(f.evidence || '（未填写）') + '</div>';
-
-      if (f.contributors && f.contributors.length) {
-        h += '<div class="sub-card"><div class="muted small">已合并 ' + f.contributors.length + ' 条独立提交（来源保留）：</div>';
-        for (var c = 0; c < f.contributors.length; c++) {
-          var ct = f.contributors[c];
-          h += '<div style="margin-top:5px">· ' + esc(ct.content) +
-            '<div class="muted small">来源：' + esc(ct.author || '（未填写）') +
-            (ct.evidence ? '　证据：' + esc(ct.evidence) : '') + '</div></div>';
-        }
-        h += '</div>';
+        '<div class="tl-time">' + esc(tf.timelineAt || '未标时间') +
+        (tf.key ? ' <span class="badge ok">关键</span>' : '') + '</div>' +
+        '<div class="tl-body"><div style="white-space:pre-wrap">' + esc(tf.content) + '</div>';
+      if (tf.contributors && tf.contributors.length) {
+        h += '<div class="muted small" style="margin-top:6px">另有 ' + tf.contributors.length + ' 条已合并的记录</div>';
       }
-
-      h += '<div class="row" style="margin-top:8px">' +
-        '<button class="btn sm" data-act="fact-status" data-id="' + esc(f.id) + '" data-status="verified">标为已验证</button>' +
-        '<button class="btn sm warn" data-act="fact-status" data-id="' + esc(f.id) + '" data-status="disputed">标为有争议</button>' +
-        '<button class="btn sm ghost" data-act="fact-status" data-id="' + esc(f.id) + '" data-status="pending">待验证</button>' +
-        '</div>';
       h += '</div></div>';
     }
     h += '</div>';
@@ -574,50 +559,36 @@
       }
     }
 
-    // ---- 改进项 ----
+    // ---- 改进措施 ----
     h += '<hr class="sep">';
-    h += '<div class="card"><h2>改进项</h2>' +
-      '<div class="hint">每条改进必须有验证指标；未填写验证结果不允许关闭。</div>' +
+    h += '<div class="card"><h2>改进措施</h2>' +
+      '<div class="hint">写下要做的事就行。验证可以留到以后补——它常常要等一个周期，甚至在别的目标里才闭环。</div>' +
       '<div style="margin-top:10px">' +
-      '<label class="field"><span>改进内容</span><input type="text" id="a-title" placeholder="例：优化模板入口，默认推荐一个模板"></label>' +
-      '<div class="inline-2">' +
-      '<label class="field"><span>负责人</span><input type="text" id="a-owner" placeholder="张三"></label>' +
-      '<label class="field"><span>截止日期</span><input type="date" id="a-due"></label>' +
-      '</div>' +
-      '<label class="field"><span>验证指标（如何证明生效）</span>' +
-      '<input type="text" id="a-metric" placeholder="例：模板入口到首次成功导出的中位耗时 ≤ 30 秒"></label>' +
-      '<label class="field"><span>关联原因</span><select id="a-cause"><option value="">（不关联）</option>';
-    for (var ci = 0; ci < project.causes.length; ci++) {
-      h += '<option value="' + esc(project.causes[ci].id) + '">' + esc(project.causes[ci].layer + '：' + project.causes[ci].text.slice(0, 20)) + '</option>';
-    }
-    h += '</select></label>' +
-      '<button class="btn primary block" data-act="add-action">添加改进</button>' +
+      '<label class="field"><span>改进措施</span><input type="text" id="a-title" placeholder="例：优化模板入口，默认推荐一个模板"></label>' +
+      '<button class="btn primary block" data-act="add-action">记下来</button>' +
       '</div></div>';
 
     if (!project.actions.length) {
-      h += '<div class="empty"><div class="e-t">还没有改进项</div><div>每个原因都应落到一条可验证的改进上。</div></div>';
+      h += '<div class="empty"><div class="e-t">还没有改进措施</div><div>每个原因都该落到一条具体要做的事上。</div></div>';
       return h;
     }
 
     h += '<h1 class="page-title">改进清单（' + project.actions.length + '）</h1>';
     for (var a = 0; a < project.actions.length; a++) {
       var ac = project.actions[a];
-      var stTxt = ac.status === 'verified' ? '已验证' : ac.status === 'failed' ? '未生效' : ac.status === 'doing' ? '进行中' : '未开始';
+      var closed = ac.status === 'verified' || ac.status === 'failed';
+      var stTxt = ac.status === 'verified' ? '已闭环' : ac.status === 'failed' ? '未生效' : '待验证';
       h += '<div class="item">' +
         '<div class="row between"><span class="item-t grow">' + esc(ac.title) + '</span>' +
-        '<span class="badge ' + esc(ac.status) + '">' + stTxt + '</span></div>' +
-        '<div class="kv"><b>负责人：</b>' + esc(ac.owner || '（未指定）') +
-        (ac.due ? '　<b>截止：</b>' + esc(ac.due) : '') + '</div>' +
-        '<div class="kv"><b>验证指标：</b>' + esc(ac.verifyMetric || '（未填写）') + '</div>';
-      if (ac.verifyResult) h += '<div class="kv"><b>验证结果：</b>' + esc(ac.verifyResult) + '</div>';
-      if (ac.status !== 'verified') {
-        h += '<div class="row" style="margin-top:8px">' +
-          (ac.status === 'open' ? '<button class="btn sm" data-act="act-doing" data-id="' + esc(ac.id) + '">开始</button>' : '') +
-          '<button class="btn sm ok" data-act="act-close" data-id="' + esc(ac.id) + '">验证并关闭</button>' +
-          '<button class="btn sm warn" data-act="act-failed" data-id="' + esc(ac.id) + '">标记未生效</button>' +
-          '</div>';
+        '<span class="badge ' + esc(ac.status) + '">' + stTxt + '</span></div>';
+      if (ac.verifyResult) {
+        h += '<div class="kv"><b>验证结论：</b>' + esc(ac.verifyResult) + '</div>';
+        h += '<div class="muted small">' + fmtTime(ac.closedAt) + ' 闭环</div>';
       } else {
-        h += '<div class="row" style="margin-top:8px"><span class="muted small">已于 ' + fmtTime(ac.closedAt) + ' 验证关闭</span></div>';
+        h += '<div class="row" style="margin-top:8px">' +
+          '<button class="btn sm ok" data-act="act-close" data-id="' + esc(ac.id) + '">补录验证</button>' +
+          '<button class="btn sm warn" data-act="act-failed" data-id="' + esc(ac.id) + '">未生效</button>' +
+          '</div>';
       }
       h += '</div>';
     }
@@ -631,7 +602,7 @@
     var linked = project.linkedProjectIds || [];
 
     h += '<div class="card"><h2>关联历史复盘</h2>' +
-      '<div class="hint">选择要横向对比的历史复盘，可多选。系统会高亮<b>重复原因</b>与<b>未生效改进</b>。</div>';
+      '<div class="hint">选择要横向对比的历史复盘，可多选。系统会高亮<b>重复原因</b>与<b>上次没闭环的改进</b>。</div>';
     if (!all.length) {
       h += '<div class="hint" style="margin-top:10px">暂无可对比的其他项目。</div>';
     } else {
@@ -686,31 +657,29 @@
       }
       h += '</div>';
 
-      h += '<div class="sub-card"><div class="muted small">未生效改进（来自上次）</div>';
+      h += '<div class="sub-card"><div class="muted small">上次没闭环的改进</div>';
       if (cmp.ineffectiveActions.length) {
         for (var ic = 0; ic < cmp.ineffectiveActions.length; ic++) {
           var ia = cmp.ineffectiveActions[ic];
-          var ast = ia.action.status === 'failed' ? '未生效' : ia.action.status === 'doing' ? '进行中' : '未开始';
+          var ast = ia.failed ? '未生效' : '待验证';
           h += '<div class="item highlight" style="margin-top:8px">' +
-            '<div class="hl-tag">未生效改进 · ' + esc(ast) + '</div>' +
+            '<div class="hl-tag">未闭环改进 · ' + esc(ast) + '</div>' +
             '<div class="kv">' + esc(ia.action.title) + '</div>' +
-            '<div class="kv">负责人：' + esc(ia.action.owner || '—') +
-            (ia.action.due ? '　截止：' + esc(ia.action.due) : '') + '</div>' +
-            '<div class="kv">验证指标：' + esc(ia.action.verifyMetric || '（未填写）') + '</div>' +
+            (ia.action.verifyResult ? '<div class="kv">验证结论：' + esc(ia.action.verifyResult) + '</div>' : '') +
             '</div>';
         }
       } else {
-        h += '<div class="kv">上次改进均已验证生效</div>';
+        h += '<div class="kv">上次的改进都已闭环</div>';
       }
       h += '</div></div>';
     }
 
     if (!anyRep && !anyIneff) {
-      h += '<div class="alert-box ok">对比结果：没有发现重复原因，也没有未生效的改进。继续保持。</div>';
+      h += '<div class="alert-box ok">对比结果：没有发现重复原因，上次的改进也都闭环了。继续保持。</div>';
     } else {
       h += '<div class="alert-box">对比结果：' +
         (anyRep ? '存在<b>重复原因</b>' : '无重复原因') + '；' +
-        (anyIneff ? '存在<b>未生效改进</b>' : '无未生效改进') + '。请在本次改进中重点处理。</div>';
+        (anyIneff ? '上次有<b>改进没闭环</b>' : '上次改进都闭环了') + '。请在本次改进中重点处理。</div>';
     }
     return h;
   }
@@ -792,27 +761,28 @@
     host.innerHTML = h;
   }
 
-  // ---------- 关闭改进弹窗（验收 C 的 UI 拦截） ----------
+  // ---------- 补录验证弹窗 ----------
+  // 验证是可选的：改进措施先记下来，验证可以隔很久再补，甚至在别的目标下闭环。
   function openCloseDialog(action, targetStatus) {
     var host = $('modal-root');
     if (!host) return;
     var isFail = targetStatus === 'failed';
     host.innerHTML =
       '<div class="modal-mask"><div class="modal" style="max-width:460px">' +
-      '<h3>' + (isFail ? '记录未生效结论' : '验证并关闭改进') + '</h3>' +
+      '<h3>' + (isFail ? '记录未生效' : '补录验证') + '</h3>' +
       '<div class="modal-sub">' + esc(action.title) + '</div>' +
-      '<div class="alert-box">改进项未经验证不得关闭：验证指标与验证结果都必须填写。</div>' +
-      '<label class="field"><span>验证指标</span>' +
-      '<input type="text" id="cl-metric" value="' + esc(action.verifyMetric || '') + '"></label>' +
-      '<label class="field"><span>验证结果（必填）</span>' +
+      '<div class="hint">写下这次验证的结论即可。指标可以留空；如果以后想补，随时再打开。</div>' +
+      '<label class="field" style="margin-top:10px"><span>验证指标（可选）</span>' +
+      '<input type="text" id="cl-metric" value="' + esc(action.verifyMetric || '') + '" placeholder="例：中位耗时 ≤ 30 秒"></label>' +
+      '<label class="field"><span>验证结论（必填）</span>' +
       '<textarea id="cl-result" placeholder="' +
-      (isFail ? '例：11-18 复测，中位耗时 52 秒，仍高于 30 秒阈值，未生效' : '例：11-18 复测，中位耗时 24 秒，低于 30 秒阈值') +
+      (isFail ? '例：11-18 复测，中位耗时 52 秒，仍高于 30 秒阈值' : '例：11-18 复测，中位耗时 24 秒，低于 30 秒阈值') +
       '"></textarea></label>' +
       '<div class="alert-box err" id="cl-err" style="display:none"></div>' +
       '<div class="modal-foot">' +
       '<button class="btn ghost" data-act="cl-cancel">取消</button>' +
       '<button class="btn ' + (isFail ? 'warn' : 'primary') + '" data-act="cl-ok" data-id="' + esc(action.id) +
-      '" data-target="' + (isFail ? 'failed' : 'verified') + '">' + (isFail ? '记录为未生效' : '确认关闭') + '</button>' +
+      '" data-target="' + (isFail ? 'failed' : 'verified') + '">' + (isFail ? '记为未生效' : '记为已闭环') + '</button>' +
       '</div></div></div>';
   }
 
@@ -878,12 +848,12 @@
         }
         var res = store.closeAction(aid, result, target);
         if (!res.ok) {
-          // 拦截：未填写验证指标或验证结果，不允许关闭（验收 C）
+          // 拦截：没有验证结论就不能闭环
           showCloseError(res.error);
           return;
         }
         closeModal();
-        notify(target === 'failed' ? '已记录为未生效' : '改进项已验证关闭', 'ok');
+        notify(target === 'failed' ? '已记录为未生效' : '已闭环', 'ok');
         return;
       }
 
@@ -950,18 +920,17 @@
       if (actEl === 'add-result') {
         var actual = ($('r-actual') || {}).value || '';
         var gap = ($('r-gap') || {}).value || '';
-        var author = ($('r-author') || {}).value || '';
         if (!actual.trim()) { toast('请填写实际结果', 'err'); return; }
         var metrics = pendingMetrics.filter(function (m) { return String(m.name || '').trim(); });
-        store.addResult(route.id, { actual: actual, gap: gap, author: author, metrics: metrics });
+        store.addResult(route.id, { actual: actual, gap: gap, metrics: metrics });
         pendingMetrics = [];
-        notify('结果已提交', 'ok');
+        notify('结果已记下', 'ok');
         return;
       }
       if (actEl === 'merge-result') {
-        confirmBox('以这条提交为准，其余提交将被合并掉。', function () {
+        confirmBox('以这条为准，其余提交将被合并掉。', function () {
           var mr = store.mergeResults(route.id, id);
-          if (mr.ok) notify('已合并，以该提交为准', 'ok');
+          if (mr.ok) notify('已合并，以该条为准', 'ok');
           else notify(mr.error, 'err');
         });
         return;
@@ -970,50 +939,17 @@
       // --- 事实 ---
       if (actEl === 'add-fact') {
         var content = ($('f-content') || {}).value || '';
-        if (!content.trim()) { toast('请填写事实内容', 'err'); return; }
+        if (!content.trim()) { toast('请写下发生了什么', 'err'); return; }
         store.addFact(route.id, {
-          kind: ($('f-kind') || {}).value || 'fact',
           content: content,
-          timelineAt: ($('f-time') || {}).value || '',
-          source: ($('f-source') || {}).value || '',
-          evidence: ($('f-evidence') || {}).value || '',
-          confidence: ($('f-conf') || {}).value || 'medium',
-          status: ($('f-status') || {}).value || 'pending',
-          author: ($('f-author') || {}).value || ''
+          timelineAt: ($('f-time') || {}).value || ''
         });
-        notify('事实已提交', 'ok');
+        notify('事实已记下', 'ok');
         return;
       }
-      if (actEl === 'pick-all-facts') {
-        var p2 = store.getProject(route.id);
-        p2.facts.forEach(function (f) { if (!f.mergedInto) selectedFacts[f.id] = true; });
-        render();
-        return;
-      }
-      if (actEl === 'clear-facts') {
-        selectedFacts = {};
-        factMergeMain = null;
-        render();
-        return;
-      }
-      if (actEl === 'merge-facts') {
-        var ids = Object.keys(selectedFacts);
-        var mainId = ($('merge-main') || {}).value || factMergeMain || ids[0];
-        if (!mainId) { toast('请选择主线事实', 'err'); return; }
-        var mr2 = store.mergeFacts(route.id, ids, mainId);
-        if (mr2.ok) {
-          selectedFacts = {};
-          factMergeMain = null;
-          notify('已合并 ' + mr2.merged + ' 条独立提交到主线事实，来源全部保留', 'ok');
-        } else {
-          notify(mr2.error, 'err');
-        }
-        return;
-      }
-      if (actEl === 'fact-status') {
-        var st = el.getAttribute('data-status');
-        store.updateFact(route.id, id, { status: st });
-        notify('事实状态已更新', 'ok');
+      if (actEl === 'toggle-key-fact') {
+        var kf = store.toggleKeyFact(route.id, id);
+        if (kf) notify(kf.key ? '已标为关键事实' : '已取消关键标记', 'ok');
         return;
       }
 
@@ -1045,25 +981,9 @@
       // --- 改进 ---
       if (actEl === 'add-action') {
         var atitle = ($('a-title') || {}).value || '';
-        if (!atitle.trim()) { toast('请填写改进内容', 'err'); return; }
-        var ametric = ($('a-metric') || {}).value || '';
-        if (!ametric.trim()) {
-          toast('改进项必须填写验证指标，否则无法验证关闭', 'err');
-          return;
-        }
-        store.addAction(route.id, {
-          title: atitle.trim(),
-          owner: ($('a-owner') || {}).value || '',
-          due: ($('a-due') || {}).value || '',
-          verifyMetric: ametric.trim(),
-          causeId: ($('a-cause') || {}).value || null
-        });
-        notify('改进项已添加', 'ok');
-        return;
-      }
-      if (actEl === 'act-doing') {
-        var rd = store.updateAction(id, { status: 'doing' });
-        if (!rd.ok) notify(rd.error, 'err');
+        if (!atitle.trim()) { toast('请写下要做的事', 'err'); return; }
+        store.addAction(route.id, { title: atitle.trim() });
+        notify('改进措施已记下', 'ok');
         return;
       }
       if (actEl === 'act-close') {
@@ -1135,28 +1055,6 @@
         if (act === 'pm-name') pendingMetrics[i].name = el.value;
         else if (act === 'pm-value') pendingMetrics[i].value = el.value;
         else pendingMetrics[i].target = el.value;
-      }
-    });
-
-    // 事实多选的 change 事件（部分 WebView input 不触发 click 冒泡）
-    document.addEventListener('change', function (e) {
-      var el = e.target;
-      var act = el.getAttribute ? el.getAttribute('data-act') : null;
-      if (act === 'pick-fact') {
-        var fid = el.getAttribute('data-id');
-        if (el.checked) selectedFacts[fid] = true; else delete selectedFacts[fid];
-        if (!el.checked && factMergeMain === fid) factMergeMain = null;
-        render();
-        return;
-      }
-    });
-
-    // 合并主线选择
-    document.addEventListener('change', function (e) {
-      var el = e.target;
-      if (el.id === 'merge-main') {
-        factMergeMain = el.value || null;
-        render();
       }
     });
 

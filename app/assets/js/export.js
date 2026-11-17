@@ -5,13 +5,9 @@
 
   var R = global.Reflect = global.Reflect || {};
 
-  var KIND_CN = { fact: '事实', judgment: '判断', emotion: '情绪' };
-  var CONF_CN = { low: '低', medium: '中', high: '高' };
-  var STATUS_CN = { pending: '待验证', verified: '已验证', disputed: '有争议' };
-  var ACT_STATUS_CN = { open: '未开始', doing: '进行中', verified: '已验证', failed: '未生效' };
   var TEMPLATE_CN = { light: '轻量', standard: '标准' };
   var PROJECT_STATUS_CN = { draft: '草稿', running: '进行中', archived: '已归档' };
-  var ACTION_STATE_CN = { open: '未开始', doing: '进行中', verified: '已验证', failed: '未生效' };
+  var ACTION_STATE_CN = { open: '待验证', verified: '已闭环', failed: '未生效' };
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -59,13 +55,13 @@
     var out = [];
     out.push('### ' + title);
     out.push('');
-    out.push('- 原始愿望：' + (v.originalWish || '（未填写）'));
-    out.push('- 依据：' + (v.basis || '（未填写）'));
-    out.push('- 场景假设：' + (v.scenarioHypothesis || '（未填写）'));
-    out.push('- 验证标准：');
+    out.push('- **目标**：' + (v.originalWish || '（未填写）'));
+    if (v.scenarioHypothesis) out.push('  - 场景：' + v.scenarioHypothesis);
+    if (v.basis) out.push('  - 依据：' + v.basis);
+    out.push('- **可验证的标准**：');
     var cs = criteriaLines(v.verificationCriteria);
     for (var i = 0; i < cs.length; i++) out.push('  ' + cs[i]);
-    out.push('- 调整规则：' + (v.adjustmentRule || '（未填写）'));
+    if (v.adjustmentRule) out.push('- 调整规则：' + v.adjustmentRule);
     if (v.note) out.push('- 修订说明：' + v.note);
     out.push('');
     return out;
@@ -107,7 +103,7 @@
       // 版本链
       L.push('### 版本链');
       L.push('');
-      L.push('| 版本 | 状态 | 原始愿望 | 场景假设 | 验证标准数 | 修订说明 | 时间 |');
+      L.push('| 版本 | 状态 | 目标 | 场景 | 可验证的标准数 | 修订说明 | 时间 |');
       L.push('| --- | --- | --- | --- | --- | --- | --- |');
       for (var v = 0; v < versions.length; v++) {
         var gv = versions[v];
@@ -131,9 +127,9 @@
         L.push('');
         L.push('| 维度 | v' + first.version + ' 原始目标 | v' + cur.version + ' 当前目标（已修正） |');
         L.push('| --- | --- | --- |');
-        L.push('| 原始愿望 | ' + cell(first.originalWish) + ' | ' + cell(cur.originalWish) + ' |');
-        L.push('| 场景假设 | ' + cell(first.scenarioHypothesis) + ' | ' + cell(cur.scenarioHypothesis) + ' |');
-        L.push('| 验证标准 | ' + cell(first.verificationCriteria.map(function (c) { return c.text; }).join('；')) +
+        L.push('| 目标 | ' + cell(first.originalWish) + ' | ' + cell(cur.originalWish) + ' |');
+        L.push('| 场景 | ' + cell(first.scenarioHypothesis) + ' | ' + cell(cur.scenarioHypothesis) + ' |');
+        L.push('| 可验证的标准 | ' + cell(first.verificationCriteria.map(function (c) { return c.text; }).join('；')) +
           ' | ' + cell(cur.verificationCriteria.map(function (c) { return c.text; }).join('；')) + ' |');
         L.push('| 调整规则 | ' + cell(first.adjustmentRule) + ' | ' + cell(cur.adjustmentRule) + ' |');
         L.push('');
@@ -142,8 +138,6 @@
         var b1 = goalBlock(first, 'v' + first.version + ' 原始目标');
         for (var g1 = 0; g1 < b1.length; g1++) L.push(b1[g1]);
       } else {
-        L.push('### 当前目标');
-        L.push('');
         var b2 = goalBlock(cur, 'v' + cur.version + ' 当前目标');
         for (var g2 = 0; g2 < b2.length; g2++) L.push(b2[g2]);
       }
@@ -159,7 +153,7 @@
     } else {
       for (var r = 0; r < results.length; r++) {
         var res = results[r];
-        L.push('### 提交 ' + (r + 1) + '　' + fmtTime(res.createdAt) + '　提交人：' + (res.author || '（未填写）'));
+        L.push('### 结果 ' + (r + 1) + '　' + fmtTime(res.createdAt));
         L.push('');
         L.push('- 实际结果：' + (res.actual || '（未填写）'));
         L.push('- 目标差距：' + (res.gap || '（未填写）'));
@@ -184,20 +178,25 @@
       L.push('（尚未记录事实）');
       L.push('');
     } else {
-      L.push('| 时间 | 类型 | 内容 | 来源 | 证据 | 置信度 | 状态 |');
-      L.push('| --- | --- | --- | --- | --- | --- | --- |');
+      L.push('| 时间 | 内容 | 关键 |');
+      L.push('| --- | --- | --- |');
       for (var f = 0; f < facts.length; f++) {
         var fc = facts[f];
         L.push('| ' + cell(fc.timelineAt) +
-          ' | ' + (KIND_CN[fc.kind] || '事实') +
           ' | ' + cell(fc.content) +
-          ' | ' + cell(fc.source) +
-          ' | ' + cell(fc.evidence) +
-          ' | ' + (CONF_CN[fc.confidence] || '中') +
-          ' | ' + (STATUS_CN[fc.status] || '待验证') + ' |');
+          ' | ' + (fc.key ? '★' : '') + ' |');
       }
       L.push('');
-      // 合并贡献者
+      var keyFacts = facts.filter(function (x) { return x.key; });
+      if (keyFacts.length) {
+        L.push('### 关键事实');
+        L.push('');
+        for (var kf = 0; kf < keyFacts.length; kf++) {
+          L.push('- ' + (keyFacts[kf].content || '') +
+            (keyFacts[kf].timelineAt ? '　（' + keyFacts[kf].timelineAt + '）' : ''));
+        }
+        L.push('');
+      }
       var anyContrib = false;
       for (var fc2 = 0; fc2 < facts.length; fc2++) {
         if (facts[fc2].contributors && facts[fc2].contributors.length) { anyContrib = true; break; }
@@ -212,8 +211,6 @@
           for (var ct = 0; ct < main.contributors.length; ct++) {
             var con = main.contributors[ct];
             L.push('  - 独立提交：' + (con.content || '') +
-              '　来源：' + (con.author || '（未填写）') +
-              '　证据：' + (con.evidence || '（无）') +
               '　时间：' + fmtTime(con.createdAt));
           }
         }
@@ -250,25 +247,22 @@
       L.push('（尚未制定改进）');
       L.push('');
     } else {
-      L.push('| 改进项 | 负责人 | 截止 | 验证指标 | 状态 | 验证结果 |');
-      L.push('| --- | --- | --- | --- | --- | --- |');
+      L.push('| 改进措施 | 状态 | 验证结论 |');
+      L.push('| --- | --- | --- |');
       for (var a = 0; a < actions.length; a++) {
         var ac = actions[a];
         var statusText = ACTION_STATE_CN[ac.status] || ac.status;
-        if (ac.status !== 'verified') statusText += '（**未验证，不得关闭**）';
+        if (ac.status === 'open') statusText += '（**尚未闭环**）';
         var resText = ac.verifyResult ? ac.verifyResult : '（未填写）';
-        if (ac.status !== 'verified') resText += '　——　**未验证，不得关闭**';
+        if (ac.status === 'open') resText += '　——　**尚未闭环**';
         L.push('| ' + cell(ac.title) +
-          ' | ' + cell(ac.owner) +
-          ' | ' + cell(ac.due) +
-          ' | ' + cell(ac.verifyMetric) +
           ' | ' + statusText +
           ' | ' + cell(resText) + ' |');
       }
       L.push('');
       var open = actions.filter(function (x) { return x.status !== 'verified'; });
       if (open.length) {
-        L.push('> 有 ' + open.length + ' 项改进尚未验证通过，按规则不能关闭。');
+        L.push('> 有 ' + open.length + ' 项改进尚未闭环。验证可以留到以后补——它常常要等一个周期，甚至在别的目标里才闭环。');
         L.push('');
       }
     }
@@ -308,17 +302,16 @@
             L.push('- （未发现重复原因）');
           }
           L.push('');
-          L.push('**未生效改进**');
+          L.push('**上次没闭环的改进**');
           L.push('');
           if (cmp.ineffectiveActions.length) {
             for (var ic = 0; ic < cmp.ineffectiveActions.length; ic++) {
               var ia = cmp.ineffectiveActions[ic];
-              L.push('- ⚠️ **未生效改进**（来自《' + ia.projectTitle + '》）：' + ia.action.title +
-                '　负责人：' + (ia.action.owner || '—') +
-                '　状态：' + (ACTION_STATE_CN[ia.action.status] || ia.action.status));
+              L.push('- ⚠️ **' + (ia.failed ? '未生效' : '待验证') + '**（来自《' + ia.projectTitle + '》）：' + ia.action.title +
+                (ia.action.verifyResult ? '　验证结论：' + ia.action.verifyResult : ''));
             }
           } else {
-            L.push('- （历史改进均已验证生效）');
+            L.push('- （历史改进均已闭环）');
           }
           L.push('');
         }
@@ -359,14 +352,13 @@
       actionLine = '首要改进：尚未制定';
     } else if (pending.length) {
       var p0 = pending[0];
-      actionLine = '首要改进：' + p0.title + '（负责人：' + (p0.owner || '未指定') +
-        (p0.due ? '，截止：' + p0.due : '') + '，状态：' + (ACTION_STATE_CN[p0.status] || p0.status) + '，未验证不得关闭）';
+      actionLine = '首要改进：' + p0.title + '（状态：' + (ACTION_STATE_CN[p0.status] || p0.status) + '，尚未闭环）';
     } else {
-      actionLine = '首要改进：' + actions[0].title + '（已验证）';
+      actionLine = '首要改进：' + actions[0].title + '（已闭环）';
     }
 
     var statusLine = '状态：' + (PROJECT_STATUS_CN[project.status] || '草稿') +
-      '　改进 ' + actions.filter(function (a) { return a.status === 'verified'; }).length + '/' + actions.length + ' 已验证';
+      '　改进 ' + actions.filter(function (a) { return a.status === 'verified'; }).length + '/' + actions.length + ' 已闭环';
 
     return [goalLine, gapLine, causeLine, actionLine, statusLine].join('\n');
   }
@@ -376,10 +368,6 @@
     buildSummary: buildSummary,
     fmtTime: fmtTime,
     esc: esc,
-    KIND_CN: KIND_CN,
-    CONF_CN: CONF_CN,
-    STATUS_CN: STATUS_CN,
-    ACT_STATUS_CN: ACT_STATUS_CN,
     ACTION_STATE_CN: ACTION_STATE_CN,
     PROJECT_STATUS_CN: PROJECT_STATUS_CN,
     TEMPLATE_CN: TEMPLATE_CN

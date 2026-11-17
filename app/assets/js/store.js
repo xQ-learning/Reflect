@@ -9,9 +9,7 @@
   var KEY = 'reflect.v1';
   var CORRUPT_KEY = 'reflect.v1.corrupted';
   var CAUSE_LAYERS = ['目标翻译', '执行', '资源', '外部', '其他'];
-  var CONFIDENCE = ['low', 'medium', 'high'];
-  var FACT_STATUS = ['pending', 'verified', 'disputed'];
-  var ACTION_STATUS = ['open', 'doing', 'verified', 'failed'];
+  var ACTION_STATUS = ['open', 'verified', 'failed'];
 
   var state = null;          // 内存态
   var lastError = '';        // 最近一次错误信息
@@ -111,7 +109,6 @@
           actual: str(r.actual),
           metrics: metrics,
           gap: str(r.gap),
-          author: str(r.author),
           createdAt: Number(r.createdAt) || now()
         });
       }
@@ -125,23 +122,16 @@
           for (var c = 0; c < fa.contributors.length; c++) {
             var ct = fa.contributors[c] || {};
             contributors.push({
-              author: str(ct.author),
               content: str(ct.content),
-              evidence: str(ct.evidence),
               createdAt: Number(ct.createdAt) || now()
             });
           }
         }
         proj.facts.push({
           id: str(fa.id) || uid('f'),
-          kind: ['fact', 'judgment', 'emotion'].indexOf(fa.kind) >= 0 ? fa.kind : 'fact',
           content: str(fa.content),
           timelineAt: str(fa.timelineAt),
-          source: str(fa.source),
-          evidence: str(fa.evidence),
-          confidence: CONFIDENCE.indexOf(fa.confidence) >= 0 ? fa.confidence : 'medium',
-          status: FACT_STATUS.indexOf(fa.status) >= 0 ? fa.status : 'pending',
-          author: str(fa.author),
+          key: !!fa.key,
           mergedInto: fa.mergedInto ? str(fa.mergedInto) : null,
           contributors: contributors,
           createdAt: Number(fa.createdAt) || now()
@@ -169,8 +159,6 @@
           id: str(ac.id) || uid('a'),
           causeId: ac.causeId ? str(ac.causeId) : null,
           title: str(ac.title),
-          owner: str(ac.owner),
-          due: str(ac.due),
           verifyMetric: str(ac.verifyMetric),
           verifyResult: str(ac.verifyResult),
           status: ACTION_STATUS.indexOf(ac.status) >= 0 ? ac.status : 'open',
@@ -402,7 +390,6 @@
       actual: str(data.actual),
       metrics: metrics,
       gap: str(data.gap),
-      author: str(data.author),
       createdAt: now()
     };
     p.results.push(r);
@@ -425,20 +412,16 @@
   }
 
   // ---------- 事实 ----------
+  // 精简模型：事实只保留「内容 + 时间点 + 是否关键」，其余归因交给原因与改进。
   function addFact(projectId, data) {
     var p = findProject(projectId);
     if (!p) return null;
     data = data || {};
     var f = {
       id: uid('f'),
-      kind: ['fact', 'judgment', 'emotion'].indexOf(data.kind) >= 0 ? data.kind : 'fact',
       content: str(data.content),
       timelineAt: str(data.timelineAt),
-      source: str(data.source),
-      evidence: str(data.evidence),
-      confidence: CONFIDENCE.indexOf(data.confidence) >= 0 ? data.confidence : 'medium',
-      status: FACT_STATUS.indexOf(data.status) >= 0 ? data.status : 'pending',
-      author: str(data.author),
+      key: !!data.key,
       mergedInto: null,
       contributors: [],
       createdAt: now()
@@ -455,16 +438,25 @@
     for (var i = 0; i < p.facts.length; i++) {
       var f = p.facts[i];
       if (f.id !== factId) continue;
-      if (patch.kind !== undefined && ['fact', 'judgment', 'emotion'].indexOf(patch.kind) >= 0) f.kind = patch.kind;
       if (patch.content !== undefined) f.content = str(patch.content);
       if (patch.timelineAt !== undefined) f.timelineAt = str(patch.timelineAt);
-      if (patch.source !== undefined) f.source = str(patch.source);
-      if (patch.evidence !== undefined) f.evidence = str(patch.evidence);
-      if (patch.confidence !== undefined && CONFIDENCE.indexOf(patch.confidence) >= 0) f.confidence = patch.confidence;
-      if (patch.status !== undefined && FACT_STATUS.indexOf(patch.status) >= 0) f.status = patch.status;
-      if (patch.author !== undefined) f.author = str(patch.author);
+      if (patch.key !== undefined) f.key = !!patch.key;
       persist(projectId);
       return f;
+    }
+    return null;
+  }
+
+  // 标记/取消标记关键事实
+  function toggleKeyFact(projectId, factId) {
+    var p = findProject(projectId);
+    if (!p) return null;
+    for (var i = 0; i < p.facts.length; i++) {
+      if (p.facts[i].id === factId) {
+        p.facts[i].key = !p.facts[i].key;
+        persist(projectId);
+        return p.facts[i];
+      }
     }
     return null;
   }
@@ -488,9 +480,7 @@
       if (f.id === mainId) continue;
       if (ids.indexOf(f.id) < 0) continue;
       main.contributors.push({
-        author: f.author || f.source,
         content: f.content,
-        evidence: f.evidence,
         createdAt: f.createdAt
       });
       f.mergedInto = mainId;   // 界面上不再单独显示
@@ -550,6 +540,7 @@
   }
 
   // ---------- 改进项 ----------
+  // 提交时只需一句话的「改进措施」；验证是可选的，可以在往后的周期里补录。
   function addAction(projectId, data) {
     var p = findProject(projectId);
     if (!p) return null;
@@ -558,8 +549,6 @@
       id: uid('a'),
       causeId: data.causeId ? str(data.causeId) : null,
       title: str(data.title),
-      owner: str(data.owner),
-      due: str(data.due),
       verifyMetric: str(data.verifyMetric),
       verifyResult: '',
       status: 'open',
@@ -589,43 +578,35 @@
     patch = patch || {};
     if (patch.causeId !== undefined) a.causeId = patch.causeId ? str(patch.causeId) : null;
     if (patch.title !== undefined) a.title = str(patch.title);
-    if (patch.owner !== undefined) a.owner = str(patch.owner);
-    if (patch.due !== undefined) a.due = str(patch.due);
     if (patch.verifyMetric !== undefined) a.verifyMetric = str(patch.verifyMetric);
     if (patch.verifyResult !== undefined) a.verifyResult = str(patch.verifyResult);
     if (patch.status !== undefined) {
       var st = patch.status;
       if (ACTION_STATUS.indexOf(st) < 0) return { ok: false, error: '改进项状态非法' };
-      // 硬性约束：终态（已验证 / 未生效）必须先有验证指标与验证结果（验收 C）
+      // 闭环（已验证 / 未生效）需要写下验证结论；验证指标可选
       if (st === 'verified' || st === 'failed') {
-        if (!a.verifyMetric.trim()) {
-          return { ok: false, error: '缺少验证指标，不能关闭改进项。请先填写「如何证明改进生效」。' };
-        }
         if (!a.verifyResult.trim()) {
-          return { ok: false, error: '未填写验证结果，不能关闭改进项。改进项必须验证后才能关闭。' };
+          return { ok: false, error: '请先写下验证结论（实际数据 / 观察结论），再标记闭环。' };
         }
       }
       a.status = st;
       if (st === 'verified' || st === 'failed') a.closedAt = now();
-      if (st === 'open' || st === 'doing') a.closedAt = null;
+      if (st === 'open') a.closedAt = null;
     }
     persist(hit.project.id);
     return { ok: true, action: a, project: hit.project };
   }
 
-  // 关闭改进：必须有验证指标 + 验证结果（验收 C 的硬约束）
-  // status 可选，默认 'verified'（已验证关闭）；'failed' 表示未生效。
+  // 补录验证并闭环改进项。验证指标可选，验证结论必填。
+  // status 可选，默认 'verified'（已闭环）；'failed' 表示未生效。
   function closeAction(id, verifyResult, status) {
     var hit = findAction(id);
     if (!hit) return { ok: false, error: '改进项不存在' };
     var a = hit.action;
     var target = status === 'failed' ? 'failed' : 'verified';
-    if (!a.verifyMetric.trim()) {
-      return { ok: false, error: '关闭前必须填写验证指标（如何证明改进生效）。' };
-    }
     var vr = verifyResult === undefined ? a.verifyResult : str(verifyResult);
     if (!vr.trim()) {
-      return { ok: false, error: '关闭前必须填写验证结果（实际数据 / 观察结论）。' };
+      return { ok: false, error: '请写下验证结论（实际数据 / 观察结论），再标记闭环。' };
     }
     a.verifyResult = vr.trim();
     a.status = target;
@@ -723,19 +704,13 @@
         actual: '上线后模板页停留时长上升，新用户大量从模板区跳出。',
         metrics: [{ name: '模板选择中位耗时', value: '52 秒', target: '≤ 30 秒' }],
         gap: '耗时超出目标 22 秒',
-        author: '李四',
         createdAt: t - 86400000 * 28
       }],
       facts: [{
         id: 'demo-prev-fact',
-        kind: 'fact',
         content: '新用户在模板区平均浏览 9 个模板后离开',
         timelineAt: '2026-10-20 11:00',
-        source: '埋点数据',
-        evidence: '埋点看板 v1.2',
-        confidence: 'high',
-        status: 'verified',
-        author: '李四',
+        key: true,
         mergedInto: null,
         contributors: [],
         createdAt: t - 86400000 * 28
@@ -761,8 +736,6 @@
           id: 'demo-prev-action-1',
           causeId: 'demo-prev-cause-1',
           title: '优化模板入口排序',
-          owner: '张三',
-          due: '2026-10-30',
           verifyMetric: '模板选择中位耗时 ≤ 30 秒',
           verifyResult: '',
           status: 'failed',
@@ -773,8 +746,6 @@
           id: 'demo-prev-action-2',
           causeId: 'demo-prev-cause-2',
           title: '导出队列限流',
-          owner: '李四',
-          due: '2026-11-05',
           verifyMetric: '导出排队时间 ≤ 5 秒',
           verifyResult: '',
           status: 'open',
@@ -835,81 +806,53 @@
           { name: '平均耗时', value: '13 分钟', target: '≤ 10 分钟' }
         ],
         gap: '完成率差 20 个百分点；失败率超出 7 个百分点；耗时超出 3 分钟',
-        author: '产品负责人',
         createdAt: t - 86400000 * 2
       }],
       facts: [
         {
           id: fTemplate,
-          kind: 'fact',
           content: '用户在模板入口停留超过 40 秒后退出',
           timelineAt: '2026-11-16 14:30',
-          source: '李四（用户测试观察）',
-          evidence: '录屏 R-03',
-          confidence: 'high',
-          status: 'verified',
-          author: '李四',
+          key: true,
           mergedInto: null,
           contributors: [{
-            author: '赵六',
             content: '新用户首次进入被 24 个模板的数量劝退，直接返回首页',
-            evidence: '录屏 R-05',
             createdAt: t - 86400000 * 2
           }],
           createdAt: t - 86400000 * 2
         },
         {
           id: fTemplate2,
-          kind: 'fact',
           content: '新用户首次进入被 24 个模板的数量劝退，直接返回首页',
           timelineAt: '2026-11-16 14:32',
-          source: '赵六（用户测试观察）',
-          evidence: '录屏 R-05',
-          confidence: 'medium',
-          status: 'verified',
-          author: '赵六',
+          key: false,
           mergedInto: fTemplate,
           contributors: [],
           createdAt: t - 86400000 * 2
         },
         {
           id: 'demo-cur-fact-3',
-          kind: 'fact',
           content: '素材加载失败会丢失已编辑的时间线',
           timelineAt: '2026-11-16 15:10',
-          source: '王五（客服工单）',
-          evidence: '工单 #2211',
-          confidence: 'medium',
-          status: 'verified',
-          author: '王五',
+          key: true,
           mergedInto: null,
           contributors: [],
           createdAt: t - 86400000 * 2
         },
         {
           id: 'demo-cur-fact-4',
-          kind: 'judgment',
           content: '导出流程过长是未达标的主要原因',
           timelineAt: '2026-11-16 16:00',
-          source: '产品内部讨论',
-          evidence: '会议纪要 11-16',
-          confidence: 'medium',
-          status: 'disputed',
-          author: '王五',
+          key: false,
           mergedInto: null,
           contributors: [],
           createdAt: t - 86400000 * 2
         },
         {
           id: 'demo-cur-fact-5',
-          kind: 'emotion',
           content: '用户表达「剪辑起来很爽」，但不知道从哪一步开始',
           timelineAt: '2026-11-16 16:20',
-          source: '用户访谈',
-          evidence: '访谈录音片段',
-          confidence: 'medium',
-          status: 'pending',
-          author: '王五',
+          key: false,
           mergedInto: null,
           contributors: [],
           createdAt: t - 86400000 * 2
@@ -943,11 +886,9 @@
           id: 'demo-cur-action-1',
           causeId: 'demo-cur-cause-2',
           title: '优化模板入口，默认推荐一个模板',
-          owner: '张三',
-          due: '2026-12-01',
           verifyMetric: '模板入口到首次成功导出的中位耗时 ≤ 30 秒',
           verifyResult: '',
-          status: 'doing',
+          status: 'open',
           closedAt: null,
           createdAt: t - 86400000 * 2
         },
@@ -955,8 +896,6 @@
           id: 'demo-cur-action-2',
           causeId: 'demo-cur-cause-3',
           title: '导出流程增加断点保存',
-          owner: '李四',
-          due: '2026-12-05',
           verifyMetric: '导出失败率 < 5%',
           verifyResult: '',
           status: 'open',
@@ -967,8 +906,6 @@
           id: 'demo-cur-action-3',
           causeId: 'demo-cur-cause-1',
           title: '补齐目标翻译模板（愿望 → 指标）',
-          owner: '王五',
-          due: '2026-11-25',
           verifyMetric: '下次复盘目标 100% 含可测量阈值',
           verifyResult: '11-18 检查：近 3 次复盘目标均含阈值与口径',
           status: 'verified',
@@ -1006,6 +943,7 @@
     mergeResults: mergeResults,
     addFact: addFact,
     updateFact: updateFact,
+    toggleKeyFact: toggleKeyFact,
     mergeFacts: mergeFacts,
     addCause: addCause,
     updateCause: updateCause,

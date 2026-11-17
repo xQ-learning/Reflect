@@ -209,14 +209,19 @@
     return out;
   }
 
-  // 其它复盘中未生效（status !== 'verified'）的改进项
+  // 其它复盘中尚未闭环的改进项（待验证 或 已判定未生效）
   function ineffectiveActions(currentProject, otherProject) {
     var out = [];
     var acts = (otherProject && otherProject.actions) ? otherProject.actions : [];
     var title = (otherProject && otherProject.title) ? otherProject.title : '';
     for (var i = 0; i < acts.length; i++) {
       if (acts[i].status !== 'verified') {
-        out.push({ action: acts[i], projectTitle: title });
+        out.push({
+          action: acts[i],
+          projectTitle: title,
+          // failed = 已判定未生效；open = 尚未闭环（可能还没验证）
+          failed: acts[i].status === 'failed'
+        });
       }
     }
     return out;
