@@ -103,6 +103,9 @@ python3 tools/layout_check.py       # 移动端布局体检（44 项）
 - `layout_check.py` —— 在 360px 手机视口下检查触控目标 ≥40px、横向溢出、内容裁切、Tab 栏遮挡、WCAG AA 对比度
 
 > Firefox 窗口最小宽度 500px，布局测试用 CSS `zoom` 模拟 360px 视口以真实触发窄屏问题。
+>
+> 本机 Firefox 是 snap 包，受 confinement 限制**读不到 `/tmp`**。测试要在仓库目录或
+> `~` 下运行，放到 `/tmp` 会报 `fileNotFound`。构建不受影响。
 
 截图落在 `build/shots/`。
 
