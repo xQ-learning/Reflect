@@ -74,6 +74,14 @@ PROBE = """
 
 def main():
     d = WebDriver().start()
+    try:
+        return run(d)
+    finally:
+        d.quit()
+        d.stop()
+
+
+def run(d):
     d.new_session(width=500, height=844)
     d.navigate(INDEX)
     time.sleep(1.0)
@@ -166,8 +174,6 @@ def main():
     """)
     check("文字对比度满足 WCAG AA", not contrast, str(contrast[:4]))
 
-    d.quit()
-    d.stop()
     print("\n" + "=" * 46)
     print("通过 %d / %d" % (len(PASS), len(PASS) + len(FAIL)))
     for n in FAIL:

@@ -45,8 +45,14 @@ class WebDriver:
                 self._req("DELETE", "/session/" + self.sid)
         except Exception:
             pass
+        self.sid = None
         if self.proc:
             self.proc.terminate()
+            try:
+                self.proc.wait(timeout=10)
+            except Exception:
+                self.proc.kill()
+            self.proc = None
 
     def _req(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
@@ -56,7 +62,8 @@ class WebDriver:
             raw = resp.read().decode()
         return json.loads(raw) if raw.strip() else {}
 
-    def new_session(self, width=430, height=900):
+    def new_session(self, width=430, height=900, retries=3):
+        """建会话。geckodriver 在并发/残留进程下偶发 500，这里重试几次。"""
         args = ["-headless"] if self.headless else []
         prefs = {
             "browser.download.folderList": 2,
@@ -71,10 +78,17 @@ class WebDriver:
                 }
             }
         }
-        r = self._req("POST", "/session", caps)
-        self.sid = r["value"]["sessionId"]
-        self.set_window(width, height)
-        return self
+        last = None
+        for attempt in range(retries):
+            try:
+                r = self._req("POST", "/session", caps)
+                self.sid = r["value"]["sessionId"]
+                self.set_window(width, height)
+                return self
+            except Exception as e:
+                last = e
+                time.sleep(2 + attempt * 2)
+        raise RuntimeError("创建浏览器会话失败（已重试 %d 次）: %s" % (retries, last))
 
     def set_window(self, width, height):
         self._req("POST", "/session/%s/window/rect" % self.sid, {"width": width, "height": height})

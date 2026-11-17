@@ -34,6 +34,14 @@ def check(name, cond, detail=""):
 
 def main():
     d = WebDriver().start()
+    try:
+        return run(d)
+    finally:
+        d.quit()
+        d.stop()
+
+
+def run(d):
     d.new_session(width=430, height=920)
     d.navigate(INDEX)
     time.sleep(1.0)
@@ -346,9 +354,6 @@ def main():
     check("无 JS 运行时错误", not errs, json.dumps(errs[:3]) if errs else "")
 
     d.screenshot(os.path.join(SHOTS, "final.png"))
-    d.quit()
-    d.stop()
-
     print("\n" + "=" * 52)
     print("通过 %d / %d" % (len(PASS), len(PASS) + len(FAIL)))
     if FAIL:
