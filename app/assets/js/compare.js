@@ -199,8 +199,7 @@
           out.push({
             causeA: ca[i],
             causeB: cb[j],
-            score: Math.round(score * 100) / 100,
-            layer: ca[i].layer
+            score: Math.round(score * 100) / 100
           });
         }
       }
@@ -209,16 +208,16 @@
     return out;
   }
 
-  // 其它复盘中尚未闭环的改进项（待验证 或 已判定未生效）
-  function ineffectiveActions(currentProject, otherProject) {
+  // 其它目标中尚未闭环的改进项（待验证 或 已判定未生效）
+  function ineffectiveActions(currentGoal, otherGoal) {
     var out = [];
-    var acts = (otherProject && otherProject.actions) ? otherProject.actions : [];
-    var title = (otherProject && otherProject.title) ? otherProject.title : '';
+    var acts = (otherGoal && otherGoal.actions) ? otherGoal.actions : [];
+    var desc = (otherGoal && otherGoal.goal) ? (otherGoal.goal.description || '') : '';
     for (var i = 0; i < acts.length; i++) {
       if (acts[i].status !== 'verified') {
         out.push({
           action: acts[i],
-          projectTitle: title,
+          goalDescription: desc,
           // failed = 已判定未生效；open = 尚未闭环（可能还没验证）
           failed: acts[i].status === 'failed'
         });
@@ -227,29 +226,22 @@
     return out;
   }
 
-  // 汇总对比：目标/结果概览差异 + 重复原因 + 未生效改进
-  function compareProjects(projectId, otherId) {
+  // 汇总对比：目标/结果概览差异 + 重复原因 + 没闭环的改进
+  function compareGoals(goalId, otherId) {
     var store = R.store;
     if (!store) return null;
-    var cur = store.getProject(projectId);
-    var other = store.getProject(otherId);
+    var cur = store.getGoal(goalId);
+    var other = store.getGoal(otherId);
     if (!cur || !other) return null;
-
-    var gCur = store.getCurrentGoal(cur.id);
-    var gOther = store.getCurrentGoal(other.id);
 
     var rep = repeatedCauses(cur, other);
     var ineff = ineffectiveActions(cur, other);
 
     var goalDiff = {
-      currentWish: gCur ? gCur.originalWish : '',
-      otherWish: gOther ? gOther.originalWish : '',
-      currentScenario: gCur ? gCur.scenarioHypothesis : '',
-      otherScenario: gOther ? gOther.scenarioHypothesis : '',
-      currentCriteria: gCur ? gCur.verificationCriteria.length : 0,
-      otherCriteria: gOther ? gOther.verificationCriteria.length : 0,
-      sameScenario: !!(gCur && gOther &&
-        normalize(gCur.scenarioHypothesis) === normalize(gOther.scenarioHypothesis))
+      currentDescription: cur.goal.description,
+      otherDescription: other.goal.description,
+      currentCriteria: cur.goal.criteria.join('；'),
+      otherCriteria: other.goal.criteria.join('；')
     };
 
     var resultDiff = {
@@ -285,6 +277,6 @@
     similarity: similarity,
     repeatedCauses: repeatedCauses,
     ineffectiveActions: ineffectiveActions,
-    compareProjects: compareProjects
+    compareGoals: compareGoals
   };
 })(window);

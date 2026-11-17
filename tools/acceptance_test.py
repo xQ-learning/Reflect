@@ -1,14 +1,15 @@
-"""Reflect 验收测试：用 geckodriver 驱动 Firefox 真实渲染前端，校验三条硬性验收。
+"""Reflect 验收测试：用 geckodriver 驱动 Firefox 真实渲染前端，校验目标复盘的核心行为。
 
-验收：
-  A. 模糊愿望（"我要很爽"）能通过向导引导出至少一个带阈值的验证标准
-  B. 目标修改可追溯（版本链），报告展示原目标与修正目标
-  C. 改进没有验证结论不能闭环（验证可延后补录）；历史对比能高亮重复问题
-另加：
-  D. 无外部网络请求 / 无 ES module import
+覆盖：
+  A. 目标板块两栏（目标 | 验证标准），填好即可创建目标；没有版本链
+  B. 结果 / 事实 / 原因与改进三个板块按精简后的形态渲染
+  C. 改进没有验证结论不能闭环（验证可延后补录）
+  D. 历史对比能高亮重复原因与上次没闭环的改进
   E. 控制台无 JS 报错
-  F. 板块精简：目标两栏、结果无提交人、事实两栏、改进只留措施栏
+另加：
+  F. 静态约束：无 ES module、无外部网络、无已删除的向导脚本
 """
+import json
 import os
 import re
 import sys
@@ -43,12 +44,13 @@ def main():
 
 
 def run(d):
+    os.makedirs(SHOTS, exist_ok=True)
     d.new_session(width=430, height=920)
     d.navigate(INDEX)
-    time.sleep(1.0)
+    time.sleep(1.2)
 
-    # ---------- D. 静态检查：禁止 ES module / 外部网络 ----------
-    print("\n[D] 静态约束")
+    # ---------- F. 静态约束 ----------
+    print("\n[F] 静态约束")
     assets = os.path.join(ROOT, "app", "assets")
     js_files = []
     for dirpath, _, names in os.walk(assets):
@@ -67,244 +69,250 @@ def run(d):
           "html 含外链")
     check("无 importmap/module script",
           'type="module"' not in html and "importmap" not in html)
+    check("向导脚本已删除", not os.path.exists(os.path.join(assets, "js", "wizard.js"))
+          and "wizard.js" not in html)
+    check("前端不再引用 Reflect.wizard", "Reflect.wizard" not in all_js and "R.wizard" not in all_js)
 
     # ---------- 基础环境 ----------
     print("\n[env] 运行环境")
     check("window.Reflect.store 存在", d.execute("return typeof (window.Reflect && window.Reflect.store)") == "object")
     check("window.Reflect.ui 存在", d.execute("return typeof (window.Reflect && window.Reflect.ui)") == "object")
-    check("window.Reflect.wizard 存在", d.execute("return typeof (window.Reflect && window.Reflect.wizard)") == "object")
     check("window.Reflect.compare 存在", d.execute("return typeof (window.Reflect && window.Reflect.compare)") == "object")
     check("window.Reflect.export 存在", d.execute("return typeof (window.Reflect && window.Reflect.export)") == "object")
     check("localStorage 可用",
           d.execute("try{localStorage.setItem('__t','1');return localStorage.getItem('__t')==='1'}catch(e){return false}"))
 
-    # ---------- A. 模糊愿望 → 验证标准 ----------
-    print("\n[A] 模糊愿望引导出验证标准")
+    # ---------- A. 目标板块 ----------
+    print("\n[A] 目标板块：两栏，填好即可创建目标")
     d.execute("window.Reflect.store.seedExample(); return true;")
     time.sleep(0.5)
 
-    # 走真实向导：两步 —— 目标描述 → 验证标准
-    d.execute("window.Reflect.wizard.open(null, {onDone: function(){}}); return true;")
-    time.sleep(0.6)
-    d.screenshot(os.path.join(SHOTS, "a1-wizard-step1.png"))
-    steps = d.execute("""
-      var m = document.querySelector('.modal');
-      return {dots: m.querySelectorAll('.steps .st').length,
-              sub: m.querySelector('.modal-sub').textContent,
-              hasWish: !!document.getElementById('w-wish'),
-              hasNext: !!m.querySelector('[data-act=wiz-next]')};
+    # 列表页
+    d.execute("location.hash = '#/goals'; return true;")
+    time.sleep(0.5)
+    listpage = d.execute("""
+      var v = document.getElementById('view');
+      return {hasNew: !!v.querySelector('[data-act=new-goal]'),
+              text: v.textContent,
+              goals: window.Reflect.store.getGoals().length};
     """)
-    check("向导只有两步", steps["dots"] == 2, str(steps))
-    check("步骤1 是「目标描述」", "目标描述" in steps["sub"] and steps["hasWish"], str(steps))
+    check("目标列表页有「创建目标」入口", listpage["hasNew"], str(listpage["hasNew"]))
+    check("列表里不再出现「复盘项目」字样", "复盘项目" not in listpage["text"], "")
 
+    # 进入创建表单
+    d.execute("document.querySelector('[data-act=new-goal]').click(); return true;")
+    time.sleep(0.6)
+    form = d.execute("""
+      var v = document.getElementById('view');
+      var cols = v.querySelectorAll('.cols');
+      var heads = [];
+      if (cols.length) {
+        var hs = cols[0].querySelectorAll('.col-h');
+        for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
+      }
+      return {colCount: cols.length, heads: heads,
+              hasDesc: !!document.getElementById('g-desc'),
+              hasCrit: !!v.querySelector('#g-criteria .g-crit'),
+              hasAddCrit: !!v.querySelector('[data-act=add-crit]'),
+              hasSave: !!v.querySelector('[data-act=save-goal]'),
+              text: v.textContent};
+    """)
+    check("目标表单是两栏布局", form["colCount"] == 1, str(form["colCount"]))
+    check("两栏分别是「目标」与「验证标准」",
+          form["heads"][:2] == ["目标", "验证标准"], str(form["heads"]))
+    check("左栏是目标描述输入", form["hasDesc"], str(form["hasDesc"]))
+    check("右栏是验证标准输入", form["hasCrit"], str(form["hasCrit"]))
+    check("验证标准可以再加一条", form["hasAddCrit"], str(form["hasAddCrit"]))
+    check("有「创建目标」按钮", form["hasSave"], str(form["hasSave"]))
+
+    # 已删除的东西不该出现
+    gone = ["模糊度", "场景假设", "依据", "版本链", "翻译愿望", "生成修订版本", "调整规则"]
+    for word in gone:
+        check("目标板块不再出现「%s」" % word, word not in form["text"], "")
+
+    # 加第二条验证标准
+    d.execute("document.querySelector('[data-act=add-crit]').click(); return true;")
+    time.sleep(0.4)
+    critcount = d.execute("return document.querySelectorAll('#g-criteria .g-crit').length;")
+    check("可以加到多条验证标准", critcount >= 2, "count=%d" % critcount)
+
+    # 没填验证标准 → 不让创建
     d.execute("""
-      var w = document.getElementById('w-wish');
-      if (!w) return false;
-      w.value = '我要很爽';
-      w.dispatchEvent(new Event('input', {bubbles:true}));
+      var d = document.getElementById('g-desc');
+      d.value = '我要一个很爽的剪辑工具';
+      d.dispatchEvent(new Event('input', {bubbles:true}));
       return true;
     """)
     time.sleep(0.3)
-    # 模糊度检测应命中「爽」
-    blurry = d.execute("""
-      var m = document.querySelector('.modal');
-      return m ? (m.textContent.indexOf('待翻译') >= 0 && m.textContent.indexOf('爽') >= 0) : false;
-    """)
-    check("向导检测出模糊愿望并标记待翻译", blurry)
-    d.screenshot(os.path.join(SHOTS, "a2-wizard-blurry.png"))
-
-    # 步骤1 → 步骤2（验证标准）
-    d.execute("document.querySelector('.modal [data-act=wiz-next]').click(); return true;")
+    before = d.execute("return window.Reflect.store.getGoals().length;")
+    d.execute("document.querySelector('[data-act=save-goal]').click(); return true;")
     time.sleep(0.4)
-    step2 = d.execute("""
-      var m = document.querySelector('.modal');
-      return {hasMetrics: !!document.getElementById('w-metrics'),
-              hasSubmit: !!m.querySelector('[data-act=wiz-submit]'),
-              hasSummary: !!document.getElementById('w-metrics') && !!m.querySelector('[data-act=wiz-next]'),
-              sub: m.querySelector('.modal-sub').textContent};
-    """)
-    check("向导可进入步骤2（验证标准）", step2["hasMetrics"], str(step2))
-    check("步骤2 直接给出写入按钮，不再有汇总预览步",
-          step2["hasSubmit"] and not step2["hasSummary"], str(step2))
-    check("步骤2 标题是「验证标准」", "验证标准" in step2["sub"], str(step2))
+    after = d.execute("return window.Reflect.store.getGoals().length;")
+    check("没有验证标准时不允许创建目标", after == before, "before=%s after=%s" % (before, after))
 
-    # 步骤2 关键校验点：没有确认任何验证标准时，写入必须被禁用
-    guard = d.execute("""
-      var m = document.querySelector('.modal');
-      var btn = m.querySelector('[data-act=wiz-submit]');
-      var box = document.querySelector('.modal input[type=checkbox]');
-      return {hasBtn: !!btn, disabled: btn ? !!btn.disabled : false,
-              hasCheckbox: !!box,
-              alert: m.textContent.indexOf('至少需要 1 条') >= 0};
-    """)
-    check("步骤2 在无验证标准时禁用写入按钮",
-          guard["hasBtn"] and guard["disabled"], str(guard))
-    check("步骤2 明确提示至少需要 1 条验证标准", guard["alert"], str(guard))
-
-    # 选一个指标类型 → 系统给出带阈值的候选口径
-    metric = d.execute("""
-      var btn = document.querySelector('.modal [data-act=wiz-metric]');
-      if (!btn) return 'NO_METRIC_BTN';
-      btn.click();
-      return 'OK';
-    """)
-    time.sleep(0.4)
-    cand = d.execute("""
-      var m = document.querySelector('.modal');
-      return {hasCrit: !!document.querySelector('.modal .crit'),
-              hasThreshold: !!document.querySelector('.modal [data-act=wiz-crit-threshold]'),
-              submitDisabled: document.querySelector('.modal [data-act=wiz-submit]').disabled,
-              alertText: m.textContent.replace(/\\s+/g,' ').slice(-120)};
-    """)
-    check("选择指标类型后生成候选验证标准", cand["hasCrit"], str(cand))
-    check("候选标准自带阈值口径", cand["hasThreshold"], str(cand))
-    check("候选未确认时写入按钮仍禁用", cand["submitDisabled"] is True, str(cand))
-
-    # 勾选 + 填口径后应可写入
+    # 填两条标准 → 创建成功
     d.execute("""
-      var box = document.querySelector('.modal input[type=checkbox]');
-      if (!box) return 'NO_CHECKBOX';
-      box.click();
-      var ti = document.querySelector('.modal [data-act=wiz-crit-text]');
-      if (ti) { ti.value = '5 个用户中 4 个 10 分钟内完成'; ti.dispatchEvent(new Event('input',{bubbles:true})); }
-      var th = document.querySelector('.modal [data-act=wiz-crit-threshold]');
-      if (th) { th.value = '>=4/5'; th.dispatchEvent(new Event('input',{bubbles:true})); }
-      return 'OK';
+      var ins = document.querySelectorAll('#g-criteria .g-crit');
+      ins[0].value = '5 个用户中 4 个在 10 分钟内完成剪辑并导出';
+      ins[0].dispatchEvent(new Event('input', {bubbles:true}));
+      ins[1].value = '导出失败率低于 5%';
+      ins[1].dispatchEvent(new Event('input', {bubbles:true}));
+      return true;
+    """)
+    time.sleep(0.3)
+    created = d.execute("""
+      document.querySelector('[data-act=save-goal]').click();
+      var gs = window.Reflect.store.getGoals();
+      var g = gs[gs.length-1];
+      return {count: gs.length, id: g.id,
+              desc: g.goal.description,
+              criteria: g.goal.criteria,
+              hash: location.hash};
     """)
     time.sleep(0.4)
-    after = d.execute("""
-      var btn = document.querySelector('.modal [data-act=wiz-submit]');
-      return {disabled: btn ? !!btn.disabled : true};
-    """)
-    check("确认并填写口径后解除禁用", after["disabled"] is False, str(after))
-    d.screenshot(os.path.join(SHOTS, "a3-wizard-step2.png"))
+    check("填好后能创建目标", created["count"] == before + 1, str(created))
+    check("创建后进入该目标", created["id"] in created["hash"], str(created["hash"]))
+    check("目标描述落库", "很爽" in created["desc"], str(created["desc"]))
+    check("多条验证标准都落库", len(created["criteria"]) == 2, str(created["criteria"]))
 
-    # 写入目标，验证真的落库
-    write = d.execute("""
-      var before = window.Reflect.store.getProjects().length;
-      document.querySelector('.modal [data-act=wiz-submit]').click();
-      var ps = window.Reflect.store.getProjects();
-      var p = ps[ps.length-1];
-      var g = window.Reflect.store.getCurrentGoal(p.id);
-      return {before: before, after: ps.length,
-              wish: g ? g.originalWish : '',
-              criteria: g ? g.verificationCriteria.length : 0,
-              first: g ? g.verificationCriteria[0] : null,
-              scenario: g ? g.scenarioHypothesis : ''};
+    # 只读视图 + 修改即覆盖
+    d.execute("location.hash = '#/goal/' + arguments[0] + '/goal'; return true;", [created["id"]])
+    time.sleep(0.5)
+    view = d.execute("""
+      var v = document.getElementById('view');
+      return {hasEdit: !!v.querySelector('[data-act=edit-goal]'),
+              text: v.textContent,
+              cols: v.querySelectorAll('.cols').length};
     """)
+    check("目标已建好后显示两栏只读视图", view["cols"] == 1, str(view["cols"]))
+    check("有「修改」入口", view["hasEdit"], str(view["hasEdit"]))
+    for word in gone:
+        check("只读视图不出现「%s」" % word, word not in view["text"], "")
+
+    d.execute("document.querySelector('[data-act=edit-goal]').click(); return true;")
+    time.sleep(0.5)
+    edited = d.execute("""
+      var d = document.getElementById('g-desc');
+      d.value = '我要一个很快的剪辑工具';
+      d.dispatchEvent(new Event('input', {bubbles:true}));
+      var ins = document.querySelectorAll('#g-criteria .g-crit');
+      ins[0].value = '10 分钟内出片';
+      ins[0].dispatchEvent(new Event('input', {bubbles:true}));
+      if (ins[1]) { ins[1].value = ''; ins[1].dispatchEvent(new Event('input', {bubbles:true})); }
+      document.querySelector('[data-act=save-goal]').click();
+      var g = window.Reflect.store.getGoal(arguments[0]);
+      return {desc: g.goal.description, criteria: g.goal.criteria, count: window.Reflect.store.getGoals().length};
+    """, [created["id"]])
     time.sleep(0.4)
-    check("向导写入新项目", write["after"] == write["before"] + 1, str(write))
-    check("写入后目标描述保持原样", "很爽" in write["wish"], str(write["wish"]))
-    check("写入后至少有 1 条验证标准", write["criteria"] >= 1, str(write))
-    check("写入的验证标准带阈值", bool(write["first"] and write["first"].get("threshold")),
-          str(write["first"]))
+    check("修改后覆盖原目标", "很快" in edited["desc"], str(edited))
+    check("修改后验证标准被覆盖", edited["criteria"] == ["10 分钟内出片"], str(edited["criteria"]))
+    check("修改不新增目标", edited["count"] == before + 1, str(edited["count"]))
 
-    # 直接用 API 层验证：必须能产出至少一条带阈值的标准
-    wizard_out = d.execute("""
-      var s = window.Reflect.store.createProject({title:'验收测试', template:'standard', participants:['A']});
-      var g = window.Reflect.store.addGoalVersion(s.id, {
-        originalWish:'我要很爽',
-        scenarioHypothesis:'新手 10 分钟出片',
-        verificationCriteria:[{text:'5 个用户中 4 个 10 分钟内完成', metric:'完成率', threshold:'>=4/5'}],
-        adjustmentRule:'完成率<60% 则修正目标'
-      });
-      var cur = window.Reflect.store.getCurrentGoal(s.id);
-      return {n: cur.verificationCriteria.length,
-              first: cur.verificationCriteria[0],
-              versions: window.Reflect.store.getGoalVersions(s.id).length};
+    # ---------- B. 其余板块的形态 ----------
+    print("\n[B] 结果 / 事实 / 原因与改进")
+    d.execute("location.hash = '#/goal/demo-current-clip/result'; return true;")
+    time.sleep(0.5)
+    result = d.execute("""
+      var v = document.getElementById('view');
+      return {hasAuthor: !!v.querySelector('#r-author'), text: v.textContent,
+              hasActual: !!v.querySelector('#r-actual'), hasGap: !!v.querySelector('#r-gap')};
     """)
-    check("可写入并读回验证标准", wizard_out["n"] >= 1 and wizard_out["first"]["text"], str(wizard_out))
-    check("验证标准带阈值口径",
-          bool(wizard_out["first"].get("threshold")) and bool(wizard_out["first"].get("metric")),
-          str(wizard_out["first"]))
+    check("结果板块无提交人", not result["hasAuthor"] and "提交人" not in result["text"], str(result))
+    check("结果板块保留实际结果与目标差距",
+          result["hasActual"] and result["hasGap"], str(result))
 
-    # ---------- B. 目标修改可追溯 ----------
-    print("\n[B] 目标修改可追溯 + 报告展示原/修正目标")
-    rev = d.execute("""
-      var ps = window.Reflect.store.getProjects();
-      var p = ps[0];
-      var before = window.Reflect.store.getCurrentGoal(p.id);
-      window.Reflect.store.addGoalVersion(p.id, {
-        originalWish: before.originalWish,
-        scenarioHypothesis: '老手 5 分钟出片',
-        verificationCriteria: [{text:'3 个用户中 3 个 5 分钟内完成', metric:'完成率', threshold:'3/3'}],
-        adjustmentRule: '若无改善则放弃该方向',
-        note: '假设翻译错了'
-      });
-      var vs = window.Reflect.store.getGoalVersions(p.id);
-      var cur = window.Reflect.store.getCurrentGoal(p.id);
-      var fresh = window.Reflect.store.getProject(p.id);
-      var md = window.Reflect.export.buildMarkdown(fresh, window.Reflect.store.getProjects());
-      return {versions: vs.length, current: cur.version,
-              revisedFrom: vs[vs.length-1].revisedFrom,
-              origWish: before.originalWish,
-              mdHasOriginal: md.indexOf(before.originalWish) >= 0,
-              mdHasRevised: md.indexOf('老手 5 分钟出片') >= 0,
-              mdHasSection: md.indexOf('原目标与修正目标对照') >= 0,
-              mdHasMarked: md.indexOf('已修正') >= 0,
-              mdLen: md.length};
+    d.execute("location.hash = '#/goal/demo-current-clip/facts'; return true;")
+    time.sleep(0.5)
+    facts = d.execute("""
+      var v = document.getElementById('view');
+      var cols = v.querySelectorAll('.cols');
+      return {colCount: cols.length,
+              hasTimeline: !!v.querySelector('.timeline'),
+              hasContent: !!v.querySelector('#f-content'),
+              text: v.textContent};
     """)
-    check("目标产生版本链", rev["versions"] >= 2, str(rev))
-    check("新版本记录 revisedFrom", rev["revisedFrom"] is not None, str(rev))
-    check("报告包含原目标", rev["mdHasOriginal"], str(rev))
-    check("报告包含修正后目标", rev["mdHasRevised"], str(rev))
-    check("报告有原目标与修正目标对照段", rev["mdHasSection"], str(rev))
-    check("报告标注已修正", rev["mdHasMarked"], str(rev))
+    check("事实板块没有两栏布局", facts["colCount"] == 0, str(facts["colCount"]))
+    check("事实板块保留时间线", facts["hasTimeline"], str(facts["hasTimeline"]))
+    check("事实板块保留内容输入", facts["hasContent"], str(facts["hasContent"]))
+    check("事实板块不出现「关键事实」", "关键事实" not in facts["text"], "")
+    check("事实板块不出现「关键」", "关键" not in facts["text"], "")
+    for word in ["类型", "置信度", "证据", "来源", "待验证"]:
+        check("事实板块不出现「%s」" % word, word not in facts["text"], "")
 
-    # ---------- C. 改进没验证结论就不能闭环（验证可延后补录） ----------
+    d.execute("location.hash = '#/goal/demo-current-clip/causes'; return true;")
+    time.sleep(0.5)
+    causes = d.execute("""
+      var v = document.getElementById('view');
+      return {hasLayer: !!v.querySelector('#c-layer'),
+              hasText: !!v.querySelector('#c-text'),
+              hasTitle: !!v.querySelector('#a-title'),
+              hasOwner: !!v.querySelector('#a-owner'), hasDue: !!v.querySelector('#a-due'),
+              hasMetric: !!v.querySelector('#a-metric'), hasCauseSel: !!v.querySelector('#a-cause'),
+              text: v.textContent};
+    """)
+    check("归因没有层级选择", not causes["hasLayer"], str(causes))
+    for word in ["目标翻译", "执行（", "资源（", "外部（", "层级"]:
+        check("归因不出现「%s」" % word, word not in causes["text"], "")
+    check("改进只保留改进措施输入", causes["hasTitle"], str(causes))
+    check("改进去掉负责人/截止/验证指标/关联原因",
+          not causes["hasOwner"] and not causes["hasDue"] and not causes["hasMetric"]
+          and not causes["hasCauseSel"], str(causes))
+    check("改进面板不出现「负责人」「截止」「验证指标」",
+          "负责人" not in causes["text"] and "截止" not in causes["text"]
+          and "验证指标" not in causes["text"], "")
+
+    # 事实里没有关键事实标记入口
+    d.execute("location.hash = '#/goal/demo-current-clip/facts'; return true;")
+    time.sleep(0.4)
+    noflag = d.execute("return !!document.querySelector('[data-act=toggle-key-fact]');")
+    check("没有「标为关键」入口", noflag is False, str(noflag))
+
+    # ---------- C. 改进闭环 ----------
     print("\n[C] 改进闭环必须留验证结论")
     close_guard = d.execute("""
-      var ps = window.Reflect.store.getProjects();
-      var p = ps[0];
-      // 验证可以先不填：改进措施先记下来
-      var a = window.Reflect.store.addAction(p.id, {title:'优化模板入口'});
-      var act0 = null;
-      window.Reflect.store.getState().projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act0=x; }); });
+      var gs = window.Reflect.store.getGoals();
+      var g = gs[0];
+      var a = window.Reflect.store.addAction(g.id, {title:'优化模板入口'});
       var res = window.Reflect.store.closeAction(a.id, '');
       var act = null;
-      window.Reflect.store.getState().projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act=x; }); });
-      return {created: !!a, status0: act0 ? act0.status : null,
-              hasVerifyMetric: !!(act0 && act0.verifyMetric),
-              ok: res.ok, error: res.error || '', status: act ? act.status : null};
+      window.Reflect.store.getState().goals.forEach(function(x){ x.actions.forEach(function(y){ if (y.id===a.id) act=y; }); });
+      return {created: !!a, ok: res.ok, error: res.error || '', status: act ? act.status : null};
     """)
-    check("改进措施可以先不填验证直接记下", close_guard["created"] and close_guard["status0"] == "open",
-          str(close_guard))
+    check("改进措施可以先不填验证直接记下", close_guard["created"], str(close_guard))
     check("缺少验证结论时拒绝闭环", close_guard["ok"] is False, str(close_guard))
     check("拒绝时给出错误说明", bool(close_guard["error"]), str(close_guard))
     check("状态未被改成已闭环", close_guard["status"] != "verified", str(close_guard))
 
     close_ok = d.execute("""
-      var st = window.Reflect.store.getState();
-      var p = st.projects[0];
-      var a = p.actions[p.actions.length-1];
-      // 事后补录验证结论即可闭环，验证指标可选
+      var gs = window.Reflect.store.getGoals();
+      var a = gs[0].actions[gs[0].actions.length-1];
       var res = window.Reflect.store.closeAction(a.id, '完成率从 40% 升到 75%');
       var act=null;
-      window.Reflect.store.getState().projects.forEach(function(pp){ pp.actions.forEach(function(x){ if (x.id===a.id) act=x; }); });
-      return {ok: res.ok, status: act.status, result: act.verifyResult, metric: act.verifyMetric};
+      window.Reflect.store.getState().goals.forEach(function(x){ x.actions.forEach(function(y){ if (y.id===a.id) act=y; }); });
+      return {ok: res.ok, status: act.status, result: act.verifyResult};
     """)
     check("补录验证结论后可闭环", close_ok["ok"] is True and close_ok["status"] == "verified", str(close_ok))
     check("闭环时验证结论被记录", bool(close_ok["result"]), str(close_ok))
-    check("验证指标是可选的", close_ok["metric"] == "", str(close_ok))
 
-    # ---------- D. 历史对比高亮重复原因 ----------
-    print("\n[D] 历史对比高亮重复问题")
+    # ---------- D. 对比 ----------
+    print("\n[D] 对比高亮重复问题")
     cmp_res = d.execute("""
-      var st = window.Reflect.store.getState();
-      var p = st.projects[0];
-      var other = window.Reflect.store.createProject({title:'上次复盘', template:'standard', participants:['B']});
-      window.Reflect.store.addCause(other.id, {layer:'执行', text:'新手找不到模板入口', factIds:[]});
-      window.Reflect.store.addCause(other.id, {layer:'执行', text:'导出流程太慢导致失败率高', factIds:[]});
-      // 历史复盘里的改进项：一已验证、一未验证（未生效）
+      var gs = window.Reflect.store.getGoals();
+      var cur = gs[0];
+      var other = window.Reflect.store.createGoal({description:'上次的目标', criteria:['耗时 ≤ 30 秒']});
+      window.Reflect.store.addCause(other.id, {text:'新手找不到模板入口', factIds:[]});
+      window.Reflect.store.addCause(other.id, {text:'导出流程太慢导致失败率高', factIds:[]});
       var a1 = window.Reflect.store.addAction(other.id, {title:'优化模板入口'});
       window.Reflect.store.closeAction(a1.id, '完成率升到 80%');
       window.Reflect.store.addAction(other.id, {title:'加一个导出进度条'});
-      var o = window.Reflect.store.getProject(other.id);
-      window.Reflect.store.addCause(p.id, {layer:'执行', text:'新手找不到模板入口', factIds:[]});
-      window.Reflect.store.addCause(p.id, {layer:'资源', text:'缺少预设模板', factIds:[]});
-      var rep = window.Reflect.compare.repeatedCauses(p, o);
-      var ineff = window.Reflect.compare.ineffectiveActions(p, o);
-      var full = window.Reflect.compare.compareProjects(p.id, other.id);
+      window.Reflect.store.addCause(cur.id, {text:'新手找不到模板入口', factIds:[]});
+      window.Reflect.store.addCause(cur.id, {text:'缺少预设模板', factIds:[]});
+      window.Reflect.store.linkGoal(cur.id, other.id);
+      var c = window.Reflect.store.getGoal(cur.id);
+      var o = window.Reflect.store.getGoal(other.id);
+      var rep = window.Reflect.compare.repeatedCauses(c, o);
+      var ineff = window.Reflect.compare.ineffectiveActions(c, o);
+      var full = window.Reflect.compare.compareGoals(cur.id, other.id);
       return {repCount: rep.length, topScore: rep.length ? rep[0].score : 0,
               repPair: rep.length ? [rep[0].causeA.text, rep[0].causeB.text] : null,
               ineffCount: ineff.length,
@@ -319,35 +327,38 @@ def run(d):
     check("识别上次没闭环的改进", cmp_res["ineffCount"] == 1, str(cmp_res))
     check("没闭环的改进只含未闭环项",
           cmp_res["ineffTitles"] == ["加一个导出进度条"], str(cmp_res["ineffTitles"]))
-    check("compareProjects 返回完整结构",
+    check("compareGoals 返回完整结构",
           "repeatedCauses" in cmp_res["fullKeys"] and "ineffectiveActions" in cmp_res["fullKeys"],
           str(cmp_res["fullKeys"]))
 
     # ---------- 导出 ----------
     print("\n[导出]")
     exp = d.execute("""
-      var ps = window.Reflect.store.getProjects();
-      var md = window.Reflect.export.buildMarkdown(ps[0], ps);
-      var sm = window.Reflect.export.buildSummary(ps[0]);
+      var gs = window.Reflect.store.getGoals();
+      var md = window.Reflect.export.buildMarkdown(gs[0], gs);
+      var sm = window.Reflect.export.buildSummary(gs[0]);
       return {mdLen: md.length, smLen: sm.length, md: md, sm: sm};
     """)
     check("Markdown 报告非空", exp["mdLen"] > 200, str(exp["mdLen"]))
     check("报告含目标/结果/事实/原因/改进各段",
           all(k in exp["md"] for k in ["目标", "结果", "事实", "原因", "改进"]))
     check("报告标注尚未闭环的改进", "尚未闭环" in exp["md"], "")
+    check("报告不再有版本链/对照段",
+          "版本链" not in exp["md"] and "原目标与修正目标对照" not in exp["md"], "")
     check("摘要非空", exp["smLen"] > 20, str(exp["smLen"]))
     open(os.path.join(SHOTS, "report-sample.md"), "w", encoding="utf-8").write(exp["md"])
 
     # ---------- 全流程 UI 渲染 ----------
     print("\n[UI] 各页面渲染")
     pages = [
-        ("#/projects", "p1-projects.png"),
-        ("#/project/%s/goal" % exp_id(d), "p2-goal.png"),
-        ("#/project/%s/result" % exp_id(d), "p3-result.png"),
-        ("#/project/%s/facts" % exp_id(d), "p4-facts.png"),
-        ("#/project/%s/causes" % exp_id(d), "p5-causes.png"),
-        ("#/project/%s/compare" % exp_id(d), "p6-compare.png"),
-        ("#/project/%s/export" % exp_id(d), "p7-export.png"),
+        ("#/goals", "p1-goals.png"),
+        ("#/goal/demo-current-clip/goal", "p2-goal.png"),
+        ("#/goal/demo-current-clip/result", "p3-result.png"),
+        ("#/goal/demo-current-clip/facts", "p4-facts.png"),
+        ("#/goal/demo-current-clip/causes", "p5-causes.png"),
+        ("#/goal/demo-current-clip/compare", "p6-compare.png"),
+        ("#/goal/demo-current-clip/export", "p7-export.png"),
+        ("#/goal/new/goal", "p8-new-goal.png"),
     ]
     for hash_, shot in pages:
         d.execute("location.hash = arguments[0]; return true;", [hash_])
@@ -356,216 +367,10 @@ def run(d):
         body_len = d.execute("return document.body ? document.body.innerText.trim().length : 0")
         check("页面 %s 有内容渲染" % hash_, body_len > 10, "len=%d" % body_len)
 
-    # ---------- F. 板块精简 ----------
-    print("\n[F] 板块精简")
-
-    # 目标：两栏「目标 | 可验证的标准」
-    d.execute("location.hash = '#/project/%s/goal';" % exp_id(d))
-    time.sleep(0.5)
-    goal = d.execute("""
-      var view = document.getElementById('view') || document.body;
-      var cols = view.querySelectorAll('.cols');
-      var heads = [];
-      if (cols.length) {
-        var hs = cols[0].querySelectorAll('.col-h');
-        for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
-      }
-      return {colCount: cols.length, heads: heads,
-              hasLayers: view.textContent.indexOf('第 1 层') >= 0 || view.textContent.indexOf('三层') >= 0,
-              hasCriteria: view.textContent.indexOf('可验证的标准') >= 0};
-    """)
-    check("目标为两栏布局", goal["colCount"] == 1, str(goal))
-    check("目标两栏分别是「目标」与「可验证的标准」",
-          goal["heads"][:2] == ["目标", "可验证的标准"], str(goal["heads"]))
-    check("目标不再展示「三层」结构", not goal["hasLayers"], str(goal))
-    check("目标展示可验证的标准", goal["hasCriteria"], str(goal))
-
-    # 结果：没有提交人
-    d.execute("location.hash = '#/project/%s/result';" % exp_id(d))
-    time.sleep(0.5)
-    result = d.execute("""
-      var view = document.getElementById('view') || document.body;
-      return {hasAuthorField: !!view.querySelector('#r-author'),
-              hasAuthorText: view.textContent.indexOf('提交人') >= 0,
-              hasActual: !!view.querySelector('#r-actual'),
-              hasGap: !!view.querySelector('#r-gap')};
-    """)
-    check("结果板块无提交人输入框", not result["hasAuthorField"], str(result))
-    check("结果板块不出现「提交人」字样", not result["hasAuthorText"], str(result))
-    check("结果板块保留实际结果与目标差距",
-          result["hasActual"] and result["hasGap"], str(result))
-
-    # 事实：两栏「事实 | 关键事实」，时间线保留，其余字段去掉
-    d.execute("location.hash = '#/project/%s/facts';" % exp_id(d))
-    time.sleep(0.5)
-    facts = d.execute("""
-      var view = document.getElementById('view') || document.body;
-      var cols = view.querySelectorAll('.cols');
-      var heads = [];
-      if (cols.length) {
-        var hs = cols[0].querySelectorAll('.col-h');
-        for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
-      }
-      var txt = view.textContent;
-      return {colCount: cols.length, heads: heads,
-              hasTimeline: !!view.querySelector('.timeline'),
-              hasKind: !!view.querySelector('#f-kind'), hasSource: !!view.querySelector('#f-source'),
-              hasEvidence: !!view.querySelector('#f-evidence'), hasConf: !!view.querySelector('#f-conf'),
-              hasStatus: !!view.querySelector('#f-status'), hasAuthor: !!view.querySelector('#f-author'),
-              hasContent: !!view.querySelector('#f-content'),
-              mentionsType: txt.indexOf('类型') >= 0,
-              mentionsConfidence: txt.indexOf('置信度') >= 0,
-              mentionsStatus: txt.indexOf('待验证') >= 0,
-              mentionsEvidence: txt.indexOf('证据') >= 0,
-              mentionsSource: txt.indexOf('来源') >= 0};
-    """)
-    check("事实为两栏布局", facts["colCount"] == 1, str(facts))
-    check("事实两栏分别是「事实」与「关键事实」",
-          len(facts["heads"]) >= 2 and facts["heads"][0].startswith("事实")
-          and facts["heads"][1].startswith("关键事实"), str(facts["heads"]))
-    check("事实保留时间线", facts["hasTimeline"], str(facts))
-    check("事实只保留内容与时间点输入",
-          facts["hasContent"] and not facts["hasKind"] and not facts["hasSource"]
-          and not facts["hasEvidence"] and not facts["hasConf"] and not facts["hasStatus"]
-          and not facts["hasAuthor"], str(facts))
-    check("事实不再出现类型/置信度/状态/证据/来源",
-          not facts["mentionsType"] and not facts["mentionsConfidence"]
-          and not facts["mentionsStatus"] and not facts["mentionsEvidence"]
-          and not facts["mentionsSource"], str(facts))
-
-    # 标为关键 → 关键事实栏出现
-    d.execute("window.Reflect.store.seedExample(); return true;")
-    time.sleep(0.4)
-    d.execute("location.hash = '#/project/demo-current-clip/facts'; return true;")
-    time.sleep(0.5)
-    keyflow = d.execute("""
-      var view = document.getElementById('view') || document.body;
-      var cols = view.querySelectorAll('.cols');
-      function colItems(n){
-        var c = cols[0].querySelectorAll('.col')[n];
-        return c ? c.querySelectorAll('.fact-item').length : -1;
-      }
-      var before = colItems(1);
-      var btn = view.querySelector('[data-act=toggle-key-fact]');
-      if (!btn) return {noBtn: true, before: before};
-      btn.click();
-      return {noBtn: false, before: before};
-    """)
-    time.sleep(0.5)
-    keyafter = d.execute("""
-      var view = document.getElementById('view') || document.body;
-      var cols = view.querySelectorAll('.cols');
-      var c = cols[0].querySelectorAll('.col')[1];
-      return c ? c.querySelectorAll('.fact-item').length : -1;
-    """)
-    check("事实面板有「标为关键」入口", not keyflow.get("noBtn"), str(keyflow))
-    check("标为关键后进入关键事实栏", keyafter != keyflow.get("before"), str((keyflow, keyafter)))
-
-    # 原因与改进：改进板块只保留改进措施
-    d.execute("location.hash = '#/project/demo-current-clip/causes'; return true;")
-    time.sleep(0.5)
-    causes = d.execute("""
-      var view = document.getElementById('view') || document.body;
-      return {hasTitle: !!view.querySelector('#a-title'),
-              hasOwner: !!view.querySelector('#a-owner'), hasDue: !!view.querySelector('#a-due'),
-              hasMetric: !!view.querySelector('#a-metric'), hasCauseSel: !!view.querySelector('#a-cause'),
-              mentionsOwner: view.textContent.indexOf('负责人') >= 0,
-              mentionsDue: view.textContent.indexOf('截止') >= 0,
-              mentionsVerifyMetric: view.textContent.indexOf('验证指标') >= 0};
-    """)
-    check("改进只保留改进措施输入", causes["hasTitle"], str(causes))
-    check("改进去掉负责人/截止/验证指标/关联原因",
-          not causes["hasOwner"] and not causes["hasDue"] and not causes["hasMetric"]
-          and not causes["hasCauseSel"], str(causes))
-    check("改进面板不再出现负责人/截止/验证指标",
-          not causes["mentionsOwner"] and not causes["mentionsDue"]
-          and not causes["mentionsVerifyMetric"], str(causes))
-
-    # 验证延后：改进列表里可以直接补录验证
-    d.execute("""
-      var p = window.Reflect.store.getProject('demo-current-clip');
-      window.Reflect.store.addAction(p.id, {title:'改进措施可先记下'});
-      return true;
-    """)
-    time.sleep(0.4)
-    d.execute("location.hash = '#/project/demo-current-clip/causes'; return true;")
-    time.sleep(0.5)
-    defer = d.execute("""
-      var view = document.getElementById('view') || document.body;
-      var btns = view.querySelectorAll('[data-act=act-close]');
-      return {closeBtns: btns.length,
-              text: btns.length ? btns[0].textContent.trim() : '',
-              hasFailed: !!view.querySelector('[data-act=act-failed]')};
-    """)
-    check("改进清单有「补录验证」入口", defer["closeBtns"] >= 1, str(defer))
-    check("补录验证按钮文案正确", defer["text"] == "补录验证", str(defer))
-    check("改进清单有「未生效」入口", defer["hasFailed"], str(defer))
-
     # ---------- 控制台错误 ----------
     print("\n[E] 控制台")
     errs = [l for l in d.logs("browser") if l.get("level") in ("SEVERE", "ERROR")]
     check("无 JS 运行时错误", not errs, json.dumps(errs[:3]) if errs else "")
-
-    # ---------- G. 旧版本数据升级 ----------
-    print("\n[G] 旧版本数据升级")
-    old_payload = json.dumps({
-        "version": 1,
-        "projects": [{
-            "id": "old-1", "title": "旧版本项目", "template": "standard", "status": "running",
-            "participants": ["张三"], "createdAt": 1700000000000, "updatedAt": 1700000000000,
-            "goal": {"currentVersion": 1, "versions": [
-                {"version": 1, "originalWish": "我要很爽", "basis": "b", "scenarioHypothesis": "s",
-                 "verificationCriteria": [{"text": "c1", "metric": "m", "threshold": "t"}],
-                 "adjustmentRule": "r", "note": "n", "createdAt": 1700000000000}]},
-            "results": [{"id": "r1", "actual": "a",
-                         "metrics": [{"name": "m1", "value": "1", "target": "2"}],
-                         "gap": "g", "author": "张三", "createdAt": 1700000000000}],
-            "facts": [{"id": "f1", "kind": "judgment", "content": "c",
-                       "timelineAt": "2026-01-01 10:00", "source": "src", "evidence": "ev",
-                       "confidence": "high", "status": "verified", "author": "李四",
-                       "mergedInto": None, "createdAt": 1700000000000}],
-            "causes": [{"id": "c1", "layer": "执行", "text": "t", "factIds": ["f1"],
-                        "createdAt": 1700000000000}],
-            "actions": [
-                {"id": "a1", "causeId": "c1", "title": "改", "owner": "张三",
-                 "due": "2026-12-01", "verifyMetric": "vm", "verifyResult": "",
-                 "status": "doing", "createdAt": 1700000000000},
-                {"id": "a2", "causeId": None, "title": "已验证的", "owner": None, "due": None,
-                 "verifyMetric": "vm2", "verifyResult": "好了", "status": "verified",
-                 "closedAt": 1700000000000, "createdAt": 1700000000000}],
-            "linkedProjectIds": []
-        }]
-    })
-    d.execute("localStorage.setItem('reflect.v1', arguments[0]); return true;", [old_payload])
-    d.execute("location.reload(); return true;")
-    time.sleep(1.8)
-    mig = d.execute("""
-      var p = window.Reflect.store.getProject('old-1');
-      if (!p) return {missing: true};
-      return {loaded: true,
-              fact: p.facts[0], result: p.results[0],
-              a1: p.actions[0], a2: p.actions[1]};
-    """)
-    check("旧版本数据能加载", mig.get("loaded") is True, str(mig)[:200])
-    if mig.get("loaded"):
-        f0 = mig["fact"]
-        check("旧事实只留内容/时间点/关键标记",
-              "kind" not in f0 and "source" not in f0 and "evidence" not in f0
-              and "confidence" not in f0 and "status" not in f0 and "author" not in f0
-              and f0.get("content") == "c" and f0.get("key") is False, str(f0))
-        check("旧结果去掉提交人", "author" not in mig["result"], str(mig["result"]))
-        check("旧改进去掉负责人与截止",
-              "owner" not in mig["a1"] and "due" not in mig["a1"], str(mig["a1"]))
-        check("旧「进行中」降级为「待验证」", mig["a1"]["status"] == "open", str(mig["a1"]))
-        check("旧「已验证」改进保持闭环",
-              mig["a2"]["status"] == "verified" and mig["a2"]["verifyResult"] == "好了", str(mig["a2"]))
-    for hash_ in ["#/project/old-1/goal", "#/project/old-1/facts", "#/project/old-1/causes"]:
-        d.execute("location.hash = arguments[0]; return true;", [hash_])
-        time.sleep(0.4)
-        n = d.execute("return document.body.innerText.trim().length;")
-        check("升级后页面 %s 正常渲染" % hash_, n > 10, "len=%d" % n)
-    errs2 = [l for l in d.logs("browser") if l.get("level") in ("SEVERE", "ERROR")]
-    check("升级后无 JS 运行时错误", not errs2, json.dumps(errs2[:3]) if errs2 else "")
 
     d.screenshot(os.path.join(SHOTS, "final.png"))
     print("\n" + "=" * 52)
@@ -579,10 +384,5 @@ def run(d):
     return 0
 
 
-def exp_id(d):
-    return d.execute("return window.Reflect.store.getProjects()[0].id;")
-
-
 if __name__ == "__main__":
-    import json
     sys.exit(main())

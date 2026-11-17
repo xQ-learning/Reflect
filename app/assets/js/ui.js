@@ -1,5 +1,6 @@
 /* Reflect · ui.js
-   界面层：hash 路由 + 全量重绘。经典脚本，挂载到全局 Reflect.ui。 */
+   hash 路由与渲染。主角是「目标」——一个目标就是一次复盘。
+   目标板块：两栏（目标 | 验证标准），填好即可创建目标。 */
 (function (global) {
   'use strict';
 
@@ -17,15 +18,17 @@
     { key: 'export', label: '导出', icon: 'M12 3v10m0 0l-4-4m4 4l4-4M4 17v4h16v-4' }
   ];
 
-  var FLOW_STEPS = [
-    '发起', '翻译愿望', '记结果', '记事实',
-    '归因', '改进', '闭环', '下次对比'
-  ];
+  var FLOW_STEPS = ['定目标', '记结果', '记事实', '归因', '改进', '闭环', '下次对比'];
 
-  var route = { view: 'projects', id: null, tab: 'goal' };
-  var selectedCompare = {};      // 对比项目多选：id -> true
+  var route = { view: 'goals', id: null, tab: 'goal' };
+  var selectedCompare = {};      // 对比目标多选：id -> true
   var lastMarkdown = '';
   var lastSummary = '';
+
+  // 目标表单草稿：编辑过程中保存在内存里，避免重绘丢内容
+  var goalForm = { description: '', criteria: [] };
+  var goalFormId = null;         // 草稿所属目标 id
+  var editingGoal = false;       // 是否处于「修改目标」状态
 
   // ---------- 工具 ----------
   function $(id) { return document.getElementById(id); }
@@ -45,16 +48,15 @@
       ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
 
-  function fmtDate(ts) {
-    if (!ts) return '—';
-    var d = new Date(ts);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-  }
-
   function nowLocalInput() {
     var d = new Date();
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
       ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function short(text, n) {
+    var s = String(text || '');
+    return s.length > n ? s.slice(0, n) + '…' : s;
   }
 
   // ---------- Toast ----------
@@ -178,14 +180,14 @@
   function parseHash() {
     var h = String(global.location.hash || '').replace(/^#\/?/, '');
     var parts = h.split('/').filter(function (x) { return x !== ''; });
-    if (parts[0] === 'project' && parts[1]) {
+    if (parts[0] === 'goal' && parts[1]) {
       var tab = parts[2] || 'goal';
       var ok = false;
       for (var i = 0; i < TABS.length; i++) { if (TABS[i].key === tab) ok = true; }
       if (!ok) tab = 'goal';
-      return { view: 'project', id: parts[1], tab: tab };
+      return { view: 'goal', id: parts[1], tab: tab };
     }
-    return { view: 'projects', id: null, tab: 'goal' };
+    return { view: 'goals', id: null, tab: 'goal' };
   }
 
   function go(hash) {
@@ -197,28 +199,27 @@
   function renderAppbar() {
     var bar = $('appbar');
     if (!bar) return;
-    if (route.view === 'projects') {
+    if (route.view === 'goals') {
       bar.innerHTML =
         '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#4d8dfa" stroke-width="1.8" stroke-linecap="round">' +
         '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>' +
         '<div class="title">Reflect <span class="sub">把差距变成下一次的动作</span></div>';
       return;
     }
-    var p = store.getProject(route.id);
+    var g = store.getGoal(route.id);
+    var label = route.id === 'new' ? '新目标' : (g ? short(g.goal.description, 16) : '目标');
     bar.innerHTML =
       '<button class="iconbtn" data-act="back" aria-label="返回">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M15 18l-6-6 6-6"></path></svg></button>' +
-      '<div class="title">' + esc(p ? p.title : '复盘') +
-      (p ? ' <span class="sub">' + (p.status === 'running' ? '进行中' : p.status === 'archived' ? '已归档' : '草稿') + '</span>' : '') +
-      '</div>';
+      '<div class="title">' + esc(label) + '</div>';
   }
 
   // ---------- 底部 Tab ----------
   function renderTabbar() {
     var bar = $('tabbar');
     if (!bar) return;
-    if (route.view === 'projects') { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+    if (route.view === 'goals') { bar.innerHTML = ''; bar.style.display = 'none'; return; }
     bar.style.display = 'flex';
     var h = '';
     for (var i = 0; i < TABS.length; i++) {
@@ -231,16 +232,15 @@
   }
 
   // ---------- 流程提示 ----------
-  function renderFlow(project) {
-    // 依据当前数据推断流程进度
+  function renderFlow(goal) {
     var step = 0;
-    if (project.goal.versions.length) step = 1;
-    if (project.results.length && project.facts.length) step = 2;
-    if (project.facts.length > 1) step = 3;
-    if (project.causes.length) step = 4;
-    if (project.actions.length) step = 5;
-    if (project.actions.length && project.actions.every(function (a) { return a.status === 'verified'; })) step = 6;
-    if (project.linkedProjectIds.length) step = 7;
+    if (goal.goal.description) step = 1;
+    if (goal.results.length) step = 2;
+    if (goal.facts.length) step = 3;
+    if (goal.causes.length) step = 4;
+    if (goal.actions.length) step = 5;
+    if (goal.actions.length && goal.actions.every(function (a) { return a.status === 'verified'; })) step = 6;
+    if (goal.linkedGoalIds.length) step = 6;
 
     var h = '<div class="card" style="padding:12px 14px"><div class="row between" style="margin-bottom:8px">' +
       '<strong style="font-size:14px">复盘主线</strong><span class="muted small">当前：' + esc(FLOW_STEPS[step]) + '</span></div>' +
@@ -253,50 +253,37 @@
     return h;
   }
 
-  // ---------- 项目列表页 ----------
-  function renderProjects() {
-    var projects = store.getProjects();
+  // ---------- 目标列表页 ----------
+  function renderGoals() {
+    var goals = store.getGoals();
     var h = '';
-    h += '<div class="card">' +
-      '<div class="row between"><h2 style="margin:0">新建复盘项目</h2>' +
-      '<button class="btn sm ghost" data-act="seed">载入示例</button></div>' +
-      '<div style="margin-top:10px">' +
-      '<label class="field"><span>标题</span>' +
-      '<input type="text" id="np-title" placeholder="例：剪辑工具新手 10 分钟出片体验"></label>' +
-      '<label class="field"><span>模板</span><select id="np-template">' +
-      '<option value="light">轻量（目标 → 结果 → 改进）</option>' +
-      '<option value="standard">标准（完整四层 + 横向对比）</option></select></label>' +
-      '<label class="field"><span>参与人（逗号分隔）</span>' +
-      '<input type="text" id="np-participants" placeholder="张三、李四"></label>' +
-      '<button class="btn primary block" data-act="new-project">创建项目</button>' +
-      '</div></div>';
 
-    if (!projects.length) {
-      h += '<div class="empty"><div class="e-t">还没有复盘项目</div>' +
-        '<div>从一个模糊的愿望开始，把它翻译成可检验的标准。<br>' +
+    h += '<div class="card">' +
+      '<div class="row between"><h2 style="margin:0">目标</h2>' +
+      '<button class="btn sm ghost" data-act="seed">载入示例</button></div>' +
+      '<button class="btn primary block" style="margin-top:12px" data-act="new-goal">创建目标</button>' +
+      '</div>';
+
+    if (!goals.length) {
+      h += '<div class="empty"><div class="e-t">还没有目标</div>' +
+        '<div>写下你要的东西，配一条能检验的标准。<br>' +
         '<button class="btn primary" style="margin-top:12px" data-act="seed">载入示例数据</button></div></div>';
       return h;
     }
 
-    h += '<h1 class="page-title">复盘项目（' + projects.length + '）</h1>';
-    for (var i = 0; i < projects.length; i++) {
-      var p = projects[i];
+    h += '<h1 class="page-title">全部目标（' + goals.length + '）</h1>';
+    for (var i = 0; i < goals.length; i++) {
+      var g = goals[i];
       var steps = 0;
-      if (p.goal.versions.length) steps++;
-      if (p.results.length) steps++;
-      if (p.facts.length) steps++;
-      if (p.causes.length) steps++;
-      if (p.actions.length) steps++;
+      if (g.goal.description) steps++;
+      if (g.results.length) steps++;
+      if (g.facts.length) steps++;
+      if (g.causes.length) steps++;
+      if (g.actions.length) steps++;
       var pct = Math.round(steps / 5 * 100);
-      var st = p.status === 'running' ? 'running' : (p.status === 'archived' ? 'archived' : 'draft');
-      var stTxt = p.status === 'running' ? '进行中' : (p.status === 'archived' ? '已归档' : '草稿');
-      h += '<button class="proj-card" data-act="open-project" data-id="' + esc(p.id) + '">' +
-        '<div class="row between"><span class="t">' + esc(p.title) + '</span>' +
-        '<span class="badge ' + st + '">' + stTxt + '</span></div>' +
-        '<div class="meta">' +
-        (p.template === 'standard' ? '标准模板' : '轻量模板') + ' · ' +
-        (p.participants.length ? esc(p.participants.join('、')) : '无参与人') + ' · ' +
-        '更新于 ' + fmtTime(p.updatedAt) + '</div>' +
+      h += '<button class="proj-card" data-act="open-goal" data-id="' + esc(g.id) + '">' +
+        '<div class="row between"><span class="t">' + esc(short(g.goal.description || '未填目标', 28)) + '</span></div>' +
+        '<div class="meta">' + g.goal.criteria.length + ' 条验证标准 · 更新于 ' + fmtTime(g.updatedAt) + '</div>' +
         '<div class="progress"><i style="width:' + pct + '%"></i></div>' +
         '<div class="meta">完成度 ' + steps + '/5 步</div>' +
         '</button>';
@@ -305,94 +292,66 @@
   }
 
   // ---------- 目标 Tab ----------
-  function renderGoal(project) {
+  // 表单：两栏（目标 | 验证标准）
+  function renderGoalForm(isNew) {
     var h = '';
-    h += renderFlow(project);
-    var cur = store.getCurrentGoal(project.id);
-    var versions = store.getGoalVersions(project.id);
-
     h += '<div class="card">' +
-      '<div class="row between wrap" style="margin-bottom:4px">' +
-      '<h2 style="margin:0">目标</h2>' +
-      '<div class="row">' +
-      '<button class="btn primary sm" data-act="wizard">翻译愿望</button>' +
-      '<button class="btn sm" data-act="revise">生成修订版本</button>' +
+      '<h2>' + (isNew ? '创建目标' : '修改目标') + '</h2>' +
+      '<div class="hint">左边写你要什么，右边写怎么算达成。填好就能用。</div>' +
+      '<div class="cols flush">' +
+      '<div class="col"><div class="col-h">目标</div>' +
+      '<textarea id="g-desc" placeholder="例：我要一个很爽的剪辑工具">' + esc(goalForm.description) + '</textarea>' +
+      '</div>' +
+      '<div class="col"><div class="col-h">验证标准</div>' +
+      '<div id="g-criteria">';
+    for (var i = 0; i < goalForm.criteria.length; i++) {
+      h += '<div class="crit-row" data-i="' + i + '">' +
+        '<input type="text" class="g-crit" data-i="' + i + '" value="' + esc(goalForm.criteria[i]) +
+        '" placeholder="例：完成率 ≥ 80%">' +
+        '<button class="btn sm ghost" data-act="del-crit" data-i="' + i + '" aria-label="删除">删</button>' +
+        '</div>';
+    }
+    h += '</div>' +
+      '<button class="btn sm" data-act="add-crit" style="margin-top:8px">+ 再加一条</button>' +
+      '</div></div>' +
+      '<div class="modal-foot" style="position:static">' +
+      (isNew ? '' : '<button class="btn ghost" data-act="cancel-edit">取消</button>') +
+      '<button class="btn primary" data-act="save-goal">' + (isNew ? '创建目标' : '保存') + '</button>' +
       '</div></div>';
+    return h;
+  }
 
-    if (!cur) {
-      h += '<div class="empty"><div class="e-t">还没有目标</div>' +
-        '<div>点「翻译愿望」，两步把「我要很爽」变成可检验的标准。</div>' +
-        '<button class="btn primary" style="margin-top:12px" data-act="wizard">开始翻译</button></div>';
-      h += '</div>';
-      return h;
-    }
-
-    // 两栏：目标 | 可验证的标准
-    h += '<div class="cols">';
-
-    h += '<div class="col">' +
-      '<div class="col-h">目标</div>' +
-      '<div class="col-body">' + esc(cur.originalWish || '（未填写）') + '</div>';
-    if (cur.scenarioHypothesis) {
-      h += '<div class="col-sub">场景</div><div class="col-body">' + esc(cur.scenarioHypothesis) + '</div>';
-    }
-    if (cur.basis) {
-      h += '<div class="col-sub">依据</div><div class="col-body">' + esc(cur.basis) + '</div>';
-    }
-    h += '</div>';
-
-    h += '<div class="col">' +
-      '<div class="col-h">可验证的标准</div>';
-    if (cur.verificationCriteria && cur.verificationCriteria.length) {
-      for (var i = 0; i < cur.verificationCriteria.length; i++) {
-        var c = cur.verificationCriteria[i];
-        h += '<div class="col-body" style="margin-top:6px">· ' + esc(c.text) +
-          (c.metric ? ' <span class="badge">' + esc(c.metric) + '</span>' : '') +
-          (c.threshold ? ' <span class="badge running">' + esc(c.threshold) + '</span>' : '') +
-          '</div>';
+  // 只读展示
+  function renderGoalView(goal) {
+    var h = '';
+    h += renderFlow(goal);
+    h += '<div class="card">' +
+      '<div class="row between"><h2 style="margin:0">目标</h2>' +
+      '<button class="btn sm" data-act="edit-goal">修改</button></div>' +
+      '<div class="cols">' +
+      '<div class="col"><div class="col-h">目标</div>' +
+      '<div class="col-body">' + esc(goal.goal.description || '（未填写）') + '</div>' +
+      '</div>' +
+      '<div class="col"><div class="col-h">验证标准</div>';
+    if (goal.goal.criteria.length) {
+      for (var i = 0; i < goal.goal.criteria.length; i++) {
+        h += '<div class="col-body" style="margin-top:6px">· ' + esc(goal.goal.criteria[i]) + '</div>';
       }
     } else {
       h += '<div class="badge alert">尚无验证标准</div>';
     }
-    if (cur.adjustmentRule) {
-      h += '<div class="col-sub">调整规则</div><div class="col-body">' + esc(cur.adjustmentRule) + '</div>';
-    }
-    h += '</div>';
-
-    h += '</div>';
-
-    if (cur.note) {
-      h += '<div class="sub-card"><div class="muted small">本次修订说明</div><div>' + esc(cur.note) + '</div></div>';
-    }
-    h += '</div>';
-
-    // 版本链
-    h += '<div class="card"><h2>版本链（' + versions.length + '）</h2>';
-    if (versions.length <= 1) {
-      h += '<div class="hint">尚无修订版本。当目标被修正时，旧版本会保留在这里，报告中同时展示原目标与修正目标。</div>';
-    } else {
-      h += '<div class="hint">目标可修正：以下为全部历史版本，v' + cur.version + ' 为当前版本。</div>';
-      for (var v = 0; v < versions.length; v++) {
-        var gv = versions[v];
-        var isCur = gv.version === project.goal.currentVersion;
-        h += '<div class="item"' + (isCur ? '' : ' style="opacity:.82"') + '>' +
-          '<div class="row between"><span class="item-t">v' + gv.version +
-          (isCur ? ' <span class="badge running">当前</span>' : ' <span class="badge revised">已修正</span>') +
-          '</span><span class="muted small">' + fmtTime(gv.createdAt) + '</span></div>' +
-          '<div class="kv"><b>目标：</b>' + esc(gv.originalWish) + '</div>' +
-          '<div class="kv"><b>场景：</b>' + esc(gv.scenarioHypothesis) + '</div>' +
-          '<div class="kv"><b>标准：</b>' + esc(gv.verificationCriteria.map(function (x) { return x.text; }).join('；') || '（无）') + '</div>' +
-          (gv.note ? '<div class="kv"><b>说明：</b>' + esc(gv.note) + '</div>' : '') +
-          (gv.revisedFrom ? '<div class="kv muted small">修订自 v' + gv.revisedFrom + '</div>' : '') +
-          '</div>';
-      }
-    }
-    h += '</div>';
+    h += '</div></div></div>';
     return h;
   }
 
+  function renderGoal(goal, isNew) {
+    if (isNew || editingGoal) return renderGoalForm(isNew);
+    if (!goal) return renderGoalForm(true);
+    return renderGoalView(goal);
+  }
+
   // ---------- 结果 Tab ----------
-  function renderResult(project) {
+  function renderResult(goal) {
     var h = '';
     h += '<div class="card"><h2>结果</h2>' +
       '<label class="field" style="margin-top:10px"><span>实际结果</span>' +
@@ -403,15 +362,15 @@
       '<textarea id="r-gap" placeholder="例：完成率差 20 个百分点"></textarea></label>' +
       '<button class="btn primary block" data-act="add-result">提交结果</button></div>';
 
-    if (!project.results.length) {
+    if (!goal.results.length) {
       h += '<div class="empty"><div class="e-t">还没有结果</div><div>提交实际结果与关键指标，系统会据此计算目标差距。</div></div>';
       return h;
     }
 
-    h += '<h1 class="page-title">结果记录（' + project.results.length + '）</h1>';
-    for (var i = 0; i < project.results.length; i++) {
-      var r = project.results[i];
-      var latest = i === project.results.length - 1;
+    h += '<h1 class="page-title">结果记录（' + goal.results.length + '）</h1>';
+    for (var i = 0; i < goal.results.length; i++) {
+      var r = goal.results[i];
+      var latest = i === goal.results.length - 1;
       h += '<div class="item">' +
         '<div class="row between"><span class="item-t">' + (latest ? '最新提交' : '历史提交') + '</span>' +
         '<span class="muted small">' + fmtTime(r.createdAt) + '</span></div>' +
@@ -430,132 +389,82 @@
       }
       h += '</div>';
     }
-    if (project.results.length > 1) {
-      h += '<div class="alert-box">存在 ' + project.results.length + ' 条提交。导出报告以最新一条为准；' +
+    if (goal.results.length > 1) {
+      h += '<div class="alert-box">存在 ' + goal.results.length + ' 条提交。导出报告以最新一条为准；' +
         '若需以其它提交为准，点对应记录上的「以此条为准」。</div>';
     }
     return h;
   }
 
   // ---------- 事实 Tab ----------
-  function renderFacts(project) {
+  function renderFacts(goal) {
     var h = '';
-    var all = project.facts.slice();
-    var mains = all.filter(function (f) { return !f.mergedInto; });
-    var keys = mains.filter(function (f) { return f.key; });
-
-    // 提交
     h += '<div class="card"><h2>记一条事实</h2>' +
       '<label class="field" style="margin-top:10px"><span>发生了什么</span>' +
       '<textarea id="f-content" placeholder="例：用户在模板入口停留超过 40 秒后退出"></textarea></label>' +
       '<label class="field"><span>时间点</span><input type="text" id="f-time" value="' + esc(nowLocalInput()) + '" placeholder="2026-11-16 14:30"></label>' +
       '<button class="btn primary block" data-act="add-fact">记下来</button></div>';
 
-    // 两栏：事实 | 关键事实
-    h += '<div class="cols">';
-
-    h += '<div class="col"><div class="col-h">事实（' + mains.length + '）</div>';
-    if (!mains.length) {
-      h += '<div class="muted small">还没有事实</div>';
-    }
-    for (var i = 0; i < mains.length; i++) {
-      var f = mains[i];
-      h += '<div class="fact-item">' +
-        '<div class="row between" style="align-items:flex-start">' +
-        '<span class="grow">' + esc(f.content) + '</span>' +
-        '<button class="btn sm ' + (f.key ? 'ok' : 'ghost') + '" data-act="toggle-key-fact" data-id="' + esc(f.id) + '">' +
-        (f.key ? '取消关键' : '标为关键') + '</button>' +
-        '</div>' +
-        '<div class="muted small" style="margin-top:4px">' + esc(f.timelineAt || '未标时间') + '</div>' +
-        '</div>';
-    }
-    h += '</div>';
-
-    h += '<div class="col"><div class="col-h">关键事实（' + keys.length + '）</div>';
-    if (!keys.length) {
-      h += '<div class="muted small">把真正影响结论的几条标出来，这里会单独汇总。</div>';
-    }
-    for (var k = 0; k < keys.length; k++) {
-      var kf = keys[k];
-      h += '<div class="fact-item key">' +
-        '<div>' + esc(kf.content) + '</div>' +
-        '<div class="muted small" style="margin-top:4px">' + esc(kf.timelineAt || '未标时间') + '</div>' +
-        '</div>';
-    }
-    h += '</div>';
-
-    h += '</div>';
-
-    // 时间线
-    if (!mains.length) {
-      h += '<div class="empty"><div class="e-t">还没有事实</div><div>记下发生了什么，标出关键的那几条。</div></div>';
-      return h;
-    }
-
-    var ordered = mains.slice().sort(function (a, b) {
+    var facts = goal.facts.slice().sort(function (a, b) {
       return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
     });
 
-    h += '<h1 class="page-title">时间线（' + ordered.length + '）</h1>';
+    if (!facts.length) {
+      h += '<div class="empty"><div class="e-t">还没有事实</div><div>记下发生了什么，按时间排出来。</div></div>';
+      return h;
+    }
+
+    h += '<h1 class="page-title">时间线（' + facts.length + '）</h1>';
     h += '<div class="timeline">';
-    for (var t = 0; t < ordered.length; t++) {
-      var tf = ordered[t];
+    for (var t = 0; t < facts.length; t++) {
+      var tf = facts[t];
       h += '<div class="tl-item">' +
-        '<div class="tl-time">' + esc(tf.timelineAt || '未标时间') +
-        (tf.key ? ' <span class="badge ok">关键</span>' : '') + '</div>' +
-        '<div class="tl-body"><div style="white-space:pre-wrap">' + esc(tf.content) + '</div>';
-      if (tf.contributors && tf.contributors.length) {
-        h += '<div class="muted small" style="margin-top:6px">另有 ' + tf.contributors.length + ' 条已合并的记录</div>';
-      }
-      h += '</div></div>';
+        '<div class="tl-time">' + esc(tf.timelineAt || '未标时间') + '</div>' +
+        '<div class="tl-body">' +
+        '<div style="white-space:pre-wrap">' + esc(tf.content) + '</div>' +
+        '<div class="row end" style="margin-top:8px">' +
+        '<button class="btn sm ghost" data-act="del-fact" data-id="' + esc(tf.id) + '">删除</button></div>' +
+        '</div></div>';
     }
     h += '</div>';
     return h;
   }
 
   // ---------- 原因与改进 Tab ----------
-  function renderCauses(project) {
+  function renderCauses(goal) {
     var h = '';
-    var facts = project.facts.filter(function (f) { return !f.mergedInto; });
 
     h += '<div class="card"><h2>归因</h2>' +
-      '<div class="hint">原因分层，并关联到具体事实。层级：目标翻译 / 执行 / 资源 / 外部 / 其他。</div>' +
+      '<div class="hint">写下原因，并关联到具体事实。</div>' +
       '<div style="margin-top:10px">' +
-      '<label class="field"><span>层级</span><select id="c-layer">' +
-      '<option value="目标翻译">目标翻译（愿望→标准的翻译问题）</option>' +
-      '<option value="执行">执行（做错了/没做）</option>' +
-      '<option value="资源">资源（缺人缺钱缺工具）</option>' +
-      '<option value="外部">外部（环境/依赖/市场）</option>' +
-      '<option value="其他">其他</option></select></label>' +
-      '<label class="field"><span>原因描述</span><textarea id="c-text" placeholder="例：模板入口过多导致新手在选择模板时卡住"></textarea></label>' +
+      '<label class="field"><span>原因</span><textarea id="c-text" placeholder="例：模板入口过多导致新手在选择模板时卡住"></textarea></label>' +
       '<div class="muted small">关联事实（可多选）</div><div id="c-facts" class="opts" style="margin-top:6px"></div>' +
       '<button class="btn primary block" data-act="add-cause" style="margin-top:10px">添加原因</button>' +
       '</div></div>';
 
-    if (!project.causes.length) {
-      h += '<div class="empty"><div class="e-t">还没有归因</div><div>从事实出发判断原因，并分层。</div></div>';
+    if (!goal.causes.length) {
+      h += '<div class="empty"><div class="e-t">还没有归因</div><div>从事实出发判断原因。</div></div>';
     } else {
-      h += '<h1 class="page-title">原因（' + project.causes.length + '）</h1>';
-      for (var i = 0; i < project.causes.length; i++) {
-        var c = project.causes[i];
+      h += '<h1 class="page-title">原因（' + goal.causes.length + '）</h1>';
+      for (var i = 0; i < goal.causes.length; i++) {
+        var c = goal.causes[i];
         h += '<div class="item">' +
-          '<div class="row between"><span class="badge layer">' + esc(c.layer) + '</span>' +
-          '<span class="muted small">' + fmtTime(c.createdAt) + '</span></div>' +
+          '<div class="row between"><span class="muted small">' + fmtTime(c.createdAt) + '</span></div>' +
           '<div class="kv" style="font-size:14px;color:var(--text)">' + esc(c.text) + '</div>';
         if (c.factIds && c.factIds.length) {
           h += '<div class="muted small" style="margin-top:6px">关联事实：</div>';
           for (var fi = 0; fi < c.factIds.length; fi++) {
             var fid = c.factIds[fi];
             var ft = null;
-            for (var q = 0; q < project.facts.length; q++) {
-              if (project.facts[q].id === fid) ft = project.facts[q];
+            for (var q = 0; q < goal.facts.length; q++) {
+              if (goal.facts[q].id === fid) ft = goal.facts[q];
             }
             if (ft) h += '<div class="kv">· ' + esc(ft.content) + '</div>';
           }
         }
         h += '<div class="row end" style="margin-top:8px">' +
-          '<button class="btn sm ghost" data-act="del-cause" data-id="' + esc(c.id) + '">删除</button></div>';
-        h += '</div>';
+          '<button class="btn sm ghost" data-act="del-cause" data-id="' + esc(c.id) + '">删除</button></div>' +
+          '</div>';
       }
     }
 
@@ -568,15 +477,14 @@
       '<button class="btn primary block" data-act="add-action">记下来</button>' +
       '</div></div>';
 
-    if (!project.actions.length) {
+    if (!goal.actions.length) {
       h += '<div class="empty"><div class="e-t">还没有改进措施</div><div>每个原因都该落到一条具体要做的事上。</div></div>';
       return h;
     }
 
-    h += '<h1 class="page-title">改进清单（' + project.actions.length + '）</h1>';
-    for (var a = 0; a < project.actions.length; a++) {
-      var ac = project.actions[a];
-      var closed = ac.status === 'verified' || ac.status === 'failed';
+    h += '<h1 class="page-title">改进清单（' + goal.actions.length + '）</h1>';
+    for (var a = 0; a < goal.actions.length; a++) {
+      var ac = goal.actions[a];
       var stTxt = ac.status === 'verified' ? '已闭环' : ac.status === 'failed' ? '未生效' : '待验证';
       h += '<div class="item">' +
         '<div class="row between"><span class="item-t grow">' + esc(ac.title) + '</span>' +
@@ -596,50 +504,50 @@
   }
 
   // ---------- 对比 Tab ----------
-  function renderCompare(project) {
+  function renderCompare(goal) {
     var h = '';
-    var all = store.getProjects().filter(function (p) { return p.id !== project.id; });
-    var linked = project.linkedProjectIds || [];
+    var all = store.getGoals().filter(function (g) { return g.id !== goal.id; });
+    var linked = goal.linkedGoalIds || [];
 
-    h += '<div class="card"><h2>关联历史复盘</h2>' +
-      '<div class="hint">选择要横向对比的历史复盘，可多选。系统会高亮<b>重复原因</b>与<b>上次没闭环的改进</b>。</div>';
+    h += '<div class="card"><h2>关联历史目标</h2>' +
+      '<div class="hint">选择要对比的历史目标，可多选。系统会高亮<b>重复原因</b>与<b>上次没闭环的改进</b>。</div>';
     if (!all.length) {
-      h += '<div class="hint" style="margin-top:10px">暂无可对比的其他项目。</div>';
+      h += '<div class="hint" style="margin-top:10px">暂无可对比的其他目标。</div>';
     } else {
       h += '<div class="opts" style="margin-top:10px">';
       for (var i = 0; i < all.length; i++) {
         var on = linked.indexOf(all[i].id) >= 0;
         h += '<button class="opt' + (on ? ' on' : '') + '" data-act="toggle-link" data-id="' + esc(all[i].id) + '">' +
-          (on ? '✓ ' : '') + esc(all[i].title) + '</button>';
+          (on ? '✓ ' : '') + esc(short(all[i].goal.description || '（无目标描述）', 20)) + '</button>';
       }
       h += '</div>';
     }
     h += '</div>';
 
     if (!linked.length) {
-      h += '<div class="empty"><div class="e-t">尚未关联历史复盘</div>' +
-        '<div>横向对比能发现「同一个坑踩两次」——重复原因与上次未生效的改进。</div></div>';
+      h += '<div class="empty"><div class="e-t">尚未关联历史目标</div>' +
+        '<div>对比能发现「同一个坑踩两次」——重复原因与上次未闭环的改进。</div></div>';
       return h;
     }
 
     var anyRep = false, anyIneff = false;
     for (var li = 0; li < linked.length; li++) {
-      var other = store.getProject(linked[li]);
+      var other = store.getGoal(linked[li]);
       if (!other) continue;
-      var cmp = compare.compareProjects(project.id, other.id);
+      var cmp = compare.compareGoals(goal.id, other.id);
       if (!cmp) continue;
       if (cmp.hasRepeat) anyRep = true;
       if (cmp.hasIneffective) anyIneff = true;
 
-      h += '<div class="card"><div class="row between"><h2 style="margin:0">' + esc(other.title) + '</h2>' +
+      h += '<div class="card"><div class="row between"><h2 style="margin:0">' +
+        esc(short(other.goal.description || '（无目标描述）', 20)) + '</h2>' +
         '<button class="btn sm ghost" data-act="toggle-link" data-id="' + esc(other.id) + '">取消关联</button></div>';
 
       h += '<div class="sub-card"><div class="muted small">目标差异</div>' +
-        '<div class="kv">本次愿望：' + esc(cmp.goalDiff.currentWish || '—') + '</div>' +
-        '<div class="kv">上次愿望：' + esc(cmp.goalDiff.otherWish || '—') + '</div>' +
-        '<div class="kv">本次场景：' + esc(cmp.goalDiff.currentScenario || '—') + '</div>' +
-        '<div class="kv">上次场景：' + esc(cmp.goalDiff.otherScenario || '—') +
-        (cmp.goalDiff.sameScenario ? ' <span class="badge alert">场景假设未变</span>' : '') + '</div>' +
+        '<div class="kv">本次目标：' + esc(cmp.goalDiff.currentDescription || '—') + '</div>' +
+        '<div class="kv">上次目标：' + esc(cmp.goalDiff.otherDescription || '—') + '</div>' +
+        '<div class="kv">本次验证标准：' + esc(cmp.goalDiff.currentCriteria || '—') + '</div>' +
+        '<div class="kv">上次验证标准：' + esc(cmp.goalDiff.otherCriteria || '—') + '</div>' +
         '</div>';
 
       h += '<div class="sub-card"><div class="muted small">重复原因</div>';
@@ -647,7 +555,7 @@
         for (var rc = 0; rc < cmp.repeatedCauses.length; rc++) {
           var pair = cmp.repeatedCauses[rc];
           h += '<div class="item highlight" style="margin-top:8px">' +
-            '<div class="hl-tag">重复原因 · 相似度 ' + Math.round(pair.score * 100) + '% · ' + esc(pair.layer) + '</div>' +
+            '<div class="hl-tag">重复原因 · 相似度 ' + Math.round(pair.score * 100) + '%</div>' +
             '<div class="kv">本次：' + esc(pair.causeA.text) + '</div>' +
             '<div class="kv">上次：' + esc(pair.causeB.text) + '</div>' +
             '</div>';
@@ -685,15 +593,15 @@
   }
 
   // ---------- 导出 Tab ----------
-  function renderExport(project) {
-    var md = exporter.buildMarkdown(project, store.getProjects());
-    var sum = exporter.buildSummary(project);
+  function renderExport(goal) {
+    var md = exporter.buildMarkdown(goal, store.getGoals());
+    var sum = exporter.buildSummary(goal);
     lastMarkdown = md;
     lastSummary = sum;
 
     var h = '';
     h += '<div class="card"><h2>Markdown 完整报告</h2>' +
-      '<div class="hint">包含目标版本链（原目标与修正目标对照）、结果、事实时间线、分层原因、改进项表格与横向对比。</div>' +
+      '<div class="hint">包含目标与验证标准、结果、事实时间线、原因、改进清单与横向对比。</div>' +
       '<div class="row" style="margin-top:10px">' +
       '<button class="btn primary" data-act="save-md">写入文件</button>' +
       '<button class="btn" data-act="share-md">分享</button>' +
@@ -718,26 +626,48 @@
     var view = $('view');
     if (!view) return;
 
-    if (route.view === 'projects') {
-      view.innerHTML = renderProjects();
-    } else {
-      var p = store.getProject(route.id);
-      if (!p) {
-        view.innerHTML = '<div class="empty"><div class="e-t">项目不存在</div>' +
-          '<button class="btn primary" style="margin-top:12px" data-act="back">返回项目列表</button></div>';
-        renderTabbar();
-        return;
-      }
-      var h = '';
-      if (route.tab === 'goal') h = renderGoal(p);
-      else if (route.tab === 'result') h = renderResult(p);
-      else if (route.tab === 'facts') h = renderFacts(p);
-      else if (route.tab === 'causes') h = renderCauses(p);
-      else if (route.tab === 'compare') h = renderCompare(p);
-      else h = renderExport(p);
-      view.innerHTML = h;
+    if (route.view === 'goals') {
+      editingGoal = false;
+      view.innerHTML = renderGoals();
+      renderTabbar();
+      return;
     }
+
+    var isNew = route.id === 'new';
+    var g = isNew ? null : store.getGoal(route.id);
+    if (!isNew && !g) {
+      view.innerHTML = '<div class="empty"><div class="e-t">目标不存在</div>' +
+        '<button class="btn primary" style="margin-top:12px" data-act="back">返回目标列表</button></div>';
+      renderTabbar();
+      return;
+    }
+
+    // 切换目标时重置表单草稿
+    if (goalFormId !== route.id) {
+      goalFormId = route.id;
+      editingGoal = false;
+      seedGoalForm(g);
+    }
+
+    var h = '';
+    if (route.tab === 'goal') h = renderGoal(g, isNew);
+    else if (route.tab === 'result') h = renderResult(g);
+    else if (route.tab === 'facts') h = renderFacts(g);
+    else if (route.tab === 'causes') h = renderCauses(g);
+    else if (route.tab === 'compare') h = renderCompare(g);
+    else h = renderExport(g);
+    view.innerHTML = h;
     renderTabbar();
+  }
+
+  function seedGoalForm(g) {
+    if (g) {
+      goalForm.description = g.goal.description || '';
+      goalForm.criteria = (g.goal.criteria || []).slice();
+    } else {
+      goalForm.description = '';
+      goalForm.criteria = [''];
+    }
   }
 
   // ---------- 结果表单的临时指标行 ----------
@@ -771,10 +701,8 @@
       '<div class="modal-mask"><div class="modal" style="max-width:460px">' +
       '<h3>' + (isFail ? '记录未生效' : '补录验证') + '</h3>' +
       '<div class="modal-sub">' + esc(action.title) + '</div>' +
-      '<div class="hint">写下这次验证的结论即可。指标可以留空；如果以后想补，随时再打开。</div>' +
-      '<label class="field" style="margin-top:10px"><span>验证指标（可选）</span>' +
-      '<input type="text" id="cl-metric" value="' + esc(action.verifyMetric || '') + '" placeholder="例：中位耗时 ≤ 30 秒"></label>' +
-      '<label class="field"><span>验证结论（必填）</span>' +
+      '<div class="hint">写下这次验证的结论即可。</div>' +
+      '<label class="field" style="margin-top:10px"><span>验证结论（必填）</span>' +
       '<textarea id="cl-result" placeholder="' +
       (isFail ? '例：11-18 复测，中位耗时 52 秒，仍高于 30 秒阈值' : '例：11-18 复测，中位耗时 24 秒，低于 30 秒阈值') +
       '"></textarea></label>' +
@@ -816,10 +744,10 @@
       }
 
       // --- 全局 ---
-      if (actEl === 'back') { go('#/projects'); return; }
+      if (actEl === 'back') { go('#/goals'); return; }
       if (actEl === 'tab') {
         var tab = el.getAttribute('data-tab');
-        if (route.view === 'project') go('#/project/' + route.id + '/' + tab);
+        if (route.view === 'goal') go('#/goal/' + route.id + '/' + tab);
         return;
       }
       if (actEl === 'cf-no') { closeModal(); return; }
@@ -831,22 +759,9 @@
       }
       if (actEl === 'cl-cancel') { closeModal(); return; }
       if (actEl === 'cl-ok') {
-        var metric = ($('cl-metric') || {}).value || '';
         var result = ($('cl-result') || {}).value || '';
         var target = el.getAttribute('data-target') || 'verified';
-        var aid = id;
-        var act = null;
-        var all = store.getProjects();
-        for (var i = 0; i < all.length; i++) {
-          for (var j = 0; j < all[i].actions.length; j++) {
-            if (all[i].actions[j].id === aid) act = all[i].actions[j];
-          }
-        }
-        if (!act) { closeModal(); toast('改进项不存在', 'err'); return; }
-        if (metric.trim() && metric.trim() !== act.verifyMetric) {
-          store.updateAction(aid, { verifyMetric: metric.trim() });
-        }
-        var res = store.closeAction(aid, result, target);
+        var res = store.closeAction(id, result, target);
         if (!res.ok) {
           // 拦截：没有验证结论就不能闭环
           showCloseError(res.error);
@@ -857,52 +772,77 @@
         return;
       }
 
-      // --- 项目列表 ---
+      // --- 目标列表 ---
       if (actEl === 'seed') {
         var r = store.seedExample();
         if (r && r.ok) {
           notify(r.created ? '示例数据已载入' : '示例数据已存在，直接打开即可', 'ok');
-          go('#/project/' + r.project.id + '/goal');
+          go('#/goal/' + r.goal.id + '/goal');
         } else {
           notify('载入示例失败', 'err');
         }
         return;
       }
-      if (actEl === 'new-project') {
-        var title = ($('np-title') || {}).value || '';
-        if (!title.trim()) { toast('请填写项目标题', 'err'); return; }
-        var tpl = ($('np-template') || {}).value || 'light';
-        var parts = (($('np-participants') || {}).value || '').split(/[,，、;；\s]+/).filter(function (x) { return x; });
-        var np = store.createProject({ title: title.trim(), template: tpl, participants: parts, status: 'draft' });
-        if ($('np-title')) $('np-title').value = '';
-        if ($('np-participants')) $('np-participants').value = '';
-        notify('项目已创建', 'ok');
-        go('#/project/' + np.id + '/goal');
+      if (actEl === 'new-goal') {
+        goalFormId = 'new';
+        editingGoal = false;
+        seedGoalForm(null);
+        go('#/goal/new/goal');
         return;
       }
-      if (actEl === 'open-project') {
-        go('#/project/' + id + '/goal');
+      if (actEl === 'open-goal') {
+        go('#/goal/' + id + '/goal');
         return;
       }
 
       // --- 目标 ---
-      if (actEl === 'wizard') {
-        R.wizard.open(route.id, {
-          onDone: function (info) {
-            notify('目标已写入（v' + info.criteria.length + ' 条验证标准）', 'ok');
-            go('#/project/' + info.projectId + '/goal');
-          }
-        });
+      if (actEl === 'edit-goal') {
+        var eg = store.getGoal(route.id);
+        seedGoalForm(eg);
+        editingGoal = true;
+        render();
         return;
       }
-      if (actEl === 'revise') {
-        R.wizard.open(route.id, {
-          isRevision: true,
-          onDone: function (info) {
-            notify('已生成修订版本，旧版本已保留', 'ok');
-            go('#/project/' + info.projectId + '/goal');
-          }
-        });
+      if (actEl === 'cancel-edit') {
+        editingGoal = false;
+        seedGoalForm(store.getGoal(route.id));
+        render();
+        return;
+      }
+      if (actEl === 'add-crit') {
+        goalForm.criteria.push('');
+        render();
+        return;
+      }
+      if (actEl === 'del-crit') {
+        var di = parseInt(el.getAttribute('data-i'), 10);
+        if (!isNaN(di)) { goalForm.criteria.splice(di, 1); render(); }
+        return;
+      }
+      if (actEl === 'save-goal') {
+        var desc = ($('g-desc') || {}).value || '';
+        var crits = [];
+        var inputs = document.querySelectorAll('#g-criteria .g-crit');
+        for (var ci = 0; ci < inputs.length; ci++) {
+          var v = String(inputs[ci].value || '').trim();
+          if (v) crits.push(v);
+        }
+        if (!desc.trim()) { toast('请写下目标', 'err'); return; }
+        var check = store.validateCriteria(crits);
+        if (!check.ok) { toast(check.error, 'err'); return; }
+        if (route.id === 'new') {
+          var ng = store.createGoal({ description: desc.trim(), criteria: check.criteria });
+          notify('目标已创建（' + check.criteria.length + ' 条验证标准）', 'ok');
+          goalFormId = ng.id;
+          editingGoal = false;
+          go('#/goal/' + ng.id + '/goal');
+        } else {
+          store.updateGoal(route.id, { description: desc.trim(), criteria: check.criteria });
+          notify('目标已更新', 'ok');
+          editingGoal = false;
+          seedGoalForm(store.getGoal(route.id));
+          render();
+        }
         return;
       }
 
@@ -913,8 +853,8 @@
         return;
       }
       if (actEl === 'pm-del') {
-        var di = parseInt(el.getAttribute('data-i'), 10);
-        if (!isNaN(di)) { pendingMetrics.splice(di, 1); renderPendingMetrics(); }
+        var mi = parseInt(el.getAttribute('data-i'), 10);
+        if (!isNaN(mi)) { pendingMetrics.splice(mi, 1); renderPendingMetrics(); }
         return;
       }
       if (actEl === 'add-result') {
@@ -947,26 +887,24 @@
         notify('事实已记下', 'ok');
         return;
       }
-      if (actEl === 'toggle-key-fact') {
-        var kf = store.toggleKeyFact(route.id, id);
-        if (kf) notify(kf.key ? '已标为关键事实' : '已取消关键标记', 'ok');
+      if (actEl === 'del-fact') {
+        confirmBox('确定删除这条事实？', function () {
+          store.removeFact(route.id, id);
+          notify('事实已删除', 'ok');
+        });
         return;
       }
 
       // --- 原因 ---
       if (actEl === 'add-cause') {
         var ctext = ($('c-text') || {}).value || '';
-        if (!ctext.trim()) { toast('请填写原因描述', 'err'); return; }
+        if (!ctext.trim()) { toast('请写下原因', 'err'); return; }
         var chosen = [];
         var boxes = document.querySelectorAll('#c-facts input[type=checkbox]');
         for (var bi = 0; bi < boxes.length; bi++) {
           if (boxes[bi].checked) chosen.push(boxes[bi].getAttribute('data-fid'));
         }
-        store.addCause(route.id, {
-          layer: ($('c-layer') || {}).value || '其他',
-          text: ctext.trim(),
-          factIds: chosen
-        });
+        store.addCause(route.id, { text: ctext.trim(), factIds: chosen });
         notify('原因已添加', 'ok');
         return;
       }
@@ -988,10 +926,10 @@
       }
       if (actEl === 'act-close') {
         var target = null;
-        var ps = store.getProjects();
-        for (var ti = 0; ti < ps.length; ti++) {
-          for (var tj = 0; tj < ps[ti].actions.length; tj++) {
-            if (ps[ti].actions[j].id === id) target = ps[ti].actions[tj];
+        var gs = store.getGoals();
+        for (var ti = 0; ti < gs.length; ti++) {
+          for (var tj = 0; tj < gs[ti].actions.length; tj++) {
+            if (gs[ti].actions[tj].id === id) target = gs[ti].actions[tj];
           }
         }
         if (target) openCloseDialog(target);
@@ -999,10 +937,10 @@
       }
       if (actEl === 'act-failed') {
         var tgt = null;
-        var pfs = store.getProjects();
-        for (var fi2 = 0; fi2 < pfs.length; fi2++) {
-          for (var fj = 0; fj < pfs[fi2].actions.length; fj++) {
-            if (pfs[fi2].actions[fj].id === id) tgt = pfs[fi2].actions[fj];
+        var gfs = store.getGoals();
+        for (var fi2 = 0; fi2 < gfs.length; fi2++) {
+          for (var fj = 0; fj < gfs[fi2].actions.length; fj++) {
+            if (gfs[fi2].actions[fj].id === id) tgt = gfs[fi2].actions[fj];
           }
         }
         if (tgt) openCloseDialog(tgt, 'failed');
@@ -1011,12 +949,12 @@
 
       // --- 对比 ---
       if (actEl === 'toggle-link') {
-        var cur = store.getProject(route.id);
-        if (cur.linkedProjectIds.indexOf(id) >= 0) {
-          store.unlinkProject(route.id, id);
+        var cur = store.getGoal(route.id);
+        if (cur.linkedGoalIds.indexOf(id) >= 0) {
+          store.unlinkGoal(route.id, id);
           notify('已取消关联', 'ok');
         } else {
-          store.linkProject(route.id, id);
+          store.linkGoal(route.id, id);
           notify('已关联', 'ok');
         }
         return;
@@ -1024,8 +962,8 @@
 
       // --- 导出 ---
       if (actEl === 'save-md') {
-        var pj = store.getProject(route.id);
-        var fname = (pj ? pj.title : 'Reflect') + '-复盘报告.md';
+        var gj = store.getGoal(route.id);
+        var fname = (gj ? short(gj.goal.description, 20) : 'Reflect') + '-复盘报告.md';
         fname = fname.replace(/[\\/:*?"<>|]/g, '_');
         saveFile(fname, lastMarkdown);
         return;
@@ -1044,10 +982,19 @@
       }
     });
 
-    // input 事件：临时指标行 & 原因关联事实
+    // input 事件：目标表单、临时指标行
     document.addEventListener('input', function (e) {
       var el = e.target;
-      var act = el.getAttribute ? el.getAttribute('data-act') : null;
+      if (!el || !el.getAttribute) return;
+
+      if (el.id === 'g-desc') { goalForm.description = el.value; return; }
+      if (el.className && el.className.indexOf('g-crit') >= 0) {
+        var gi = parseInt(el.getAttribute('data-i'), 10);
+        if (!isNaN(gi) && goalForm.criteria[gi] !== undefined) goalForm.criteria[gi] = el.value;
+        return;
+      }
+
+      var act = el.getAttribute('data-act');
       if (!act) return;
       if (act === 'pm-name' || act === 'pm-value' || act === 'pm-target') {
         var i = parseInt(el.getAttribute('data-i'), 10);
@@ -1065,9 +1012,11 @@
   function renderCauseFactPicker() {
     var host = $('c-facts');
     if (!host) return;
-    var p = store.getProject(route.id);
-    if (!p) return;
-    var facts = p.facts.filter(function (f) { return !f.mergedInto; });
+    var g = store.getGoal(route.id);
+    if (!g) { host.innerHTML = '<div class="muted small">暂无事实</div>'; return; }
+    var facts = g.facts.slice().sort(function (a, b) {
+      return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
+    });
     if (!facts.length) { host.innerHTML = '<div class="muted small">暂无事实</div>'; return; }
     var h = '';
     for (var i = 0; i < facts.length; i++) {
@@ -1081,8 +1030,8 @@
 
   // 在 causes tab 渲染后填充事实选择器
   var origRenderCauses = renderCauses;
-  renderCauses = function (project) {
-    var h = origRenderCauses(project);
+  renderCauses = function (goal) {
+    var h = origRenderCauses(goal);
     setTimeout(renderCauseFactPicker, 0);
     return h;
   };
@@ -1096,12 +1045,15 @@
     render: render,
     toast: toast,
     notify: notify,
-    confirm: confirmBox,
-    closeModal: closeModal,
-    saveFile: saveFile,
-    share: shareText,
-    copyText: copyText,
-    hasBridge: hasBridge
+    onBack: function () {
+      // 返回键：先关弹层，再退回目标列表
+      var modal = $('modal-root');
+      if (modal && modal.innerHTML) { closeModal(); return true; }
+      if (route.view === 'goal') { go('#/goals'); return true; }
+      return false;
+    },
+    start: start,
+    esc: esc
   };
 
   if (document.readyState === 'loading') {

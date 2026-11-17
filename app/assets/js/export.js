@@ -5,8 +5,6 @@
 
   var R = global.Reflect = global.Reflect || {};
 
-  var TEMPLATE_CN = { light: '轻量', standard: '标准' };
-  var PROJECT_STATUS_CN = { draft: '草稿', running: '进行中', archived: '已归档' };
   var ACTION_STATE_CN = { open: '待验证', verified: '已闭环', failed: '未生效' };
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -30,123 +28,44 @@
     return v.trim() ? v : '—';
   }
 
-  function projectById(allProjects, id) {
-    if (!allProjects || !allProjects.length) return null;
-    for (var i = 0; i < allProjects.length; i++) {
-      if (allProjects[i].id === id) return allProjects[i];
+  function goalById(allGoals, id) {
+    if (!allGoals || !allGoals.length) return null;
+    for (var i = 0; i < allGoals.length; i++) {
+      if (allGoals[i].id === id) return allGoals[i];
     }
     return null;
   }
 
-  function criteriaLines(list) {
-    if (!list || !list.length) return ['（无）'];
-    var out = [];
-    for (var i = 0; i < list.length; i++) {
-      var c = list[i] || {};
-      var txt = '- ' + (c.text || '');
-      if (c.metric) txt += '　（指标：' + c.metric + '）';
-      if (c.threshold) txt += '（阈值：' + c.threshold + '）';
-      out.push(txt);
-    }
-    return out;
-  }
-
-  function goalBlock(v, title) {
-    var out = [];
-    out.push('### ' + title);
-    out.push('');
-    out.push('- **目标**：' + (v.originalWish || '（未填写）'));
-    if (v.scenarioHypothesis) out.push('  - 场景：' + v.scenarioHypothesis);
-    if (v.basis) out.push('  - 依据：' + v.basis);
-    out.push('- **可验证的标准**：');
-    var cs = criteriaLines(v.verificationCriteria);
-    for (var i = 0; i < cs.length; i++) out.push('  ' + cs[i]);
-    if (v.adjustmentRule) out.push('- 调整规则：' + v.adjustmentRule);
-    if (v.note) out.push('- 修订说明：' + v.note);
-    out.push('');
-    return out;
-  }
-
   // 完整 Markdown 报告
-  function buildMarkdown(project, allProjects) {
-    if (!project) return '';
+  function buildMarkdown(goal, allGoals) {
+    if (!goal) return '';
     var L = [];
     var compare = R.compare;
-    var store = R.store;
 
-    L.push('# 复盘报告：' + (project.title || '未命名复盘'));
+    L.push('# 复盘报告：' + (goal.goal.description || '未命名目标'));
     L.push('');
-    L.push('- 模板：' + (TEMPLATE_CN[project.template] || '轻量'));
-    L.push('- 状态：' + (PROJECT_STATUS_CN[project.status] || '草稿'));
-    L.push('- 参与人：' + ((project.participants && project.participants.length) ? project.participants.join('、') : '（未填写）'));
-    L.push('- 创建时间：' + fmtTime(project.createdAt));
-    L.push('- 更新时间：' + fmtTime(project.updatedAt));
+    L.push('- 创建时间：' + fmtTime(goal.createdAt));
+    L.push('- 更新时间：' + fmtTime(goal.updatedAt));
     L.push('');
 
     // ---- 目标 ----
     L.push('## 一、目标');
     L.push('');
-    var versions = (project.goal && project.goal.versions) ? project.goal.versions : [];
-    var cur = null, first = null;
-    if (versions.length) {
-      first = versions[0];
-      for (var i = 0; i < versions.length; i++) {
-        if (versions[i].version === project.goal.currentVersion) cur = versions[i];
+    L.push('- **目标**：' + (goal.goal.description || '（未填写）'));
+    L.push('- **验证标准**：');
+    if (goal.goal.criteria && goal.goal.criteria.length) {
+      for (var c = 0; c < goal.goal.criteria.length; c++) {
+        L.push('  - ' + goal.goal.criteria[c]);
       }
-      if (!cur) cur = versions[versions.length - 1];
-    }
-
-    if (!versions.length) {
-      L.push('（尚未填写目标）');
-      L.push('');
     } else {
-      // 版本链
-      L.push('### 版本链');
-      L.push('');
-      L.push('| 版本 | 状态 | 目标 | 场景 | 可验证的标准数 | 修订说明 | 时间 |');
-      L.push('| --- | --- | --- | --- | --- | --- | --- |');
-      for (var v = 0; v < versions.length; v++) {
-        var gv = versions[v];
-        var isCur = gv.version === project.goal.currentVersion;
-        var state = isCur ? '当前版本' : '已修正';
-        L.push('| v' + gv.version +
-          ' | ' + state +
-          ' | ' + cell(gv.originalWish) +
-          ' | ' + cell(gv.scenarioHypothesis) +
-          ' | ' + (gv.verificationCriteria ? gv.verificationCriteria.length : 0) +
-          ' | ' + cell(gv.note) +
-          ' | ' + fmtTime(gv.createdAt) + ' |');
-      }
-      L.push('');
-
-      // 原目标 vs 修正目标对照
-      if (versions.length > 1) {
-        L.push('### 原目标与修正目标对照');
-        L.push('');
-        L.push('> **本次目标已修正。** 下表展示 v' + first.version + ' 原始目标与 v' + cur.version + ' 当前（修正后）目标的差异。');
-        L.push('');
-        L.push('| 维度 | v' + first.version + ' 原始目标 | v' + cur.version + ' 当前目标（已修正） |');
-        L.push('| --- | --- | --- |');
-        L.push('| 目标 | ' + cell(first.originalWish) + ' | ' + cell(cur.originalWish) + ' |');
-        L.push('| 场景 | ' + cell(first.scenarioHypothesis) + ' | ' + cell(cur.scenarioHypothesis) + ' |');
-        L.push('| 可验证的标准 | ' + cell(first.verificationCriteria.map(function (c) { return c.text; }).join('；')) +
-          ' | ' + cell(cur.verificationCriteria.map(function (c) { return c.text; }).join('；')) + ' |');
-        L.push('| 调整规则 | ' + cell(first.adjustmentRule) + ' | ' + cell(cur.adjustmentRule) + ' |');
-        L.push('');
-        L.push('**v' + first.version + ' 原始目标详情（已修正）**');
-        L.push('');
-        var b1 = goalBlock(first, 'v' + first.version + ' 原始目标');
-        for (var g1 = 0; g1 < b1.length; g1++) L.push(b1[g1]);
-      } else {
-        var b2 = goalBlock(cur, 'v' + cur.version + ' 当前目标');
-        for (var g2 = 0; g2 < b2.length; g2++) L.push(b2[g2]);
-      }
+      L.push('  - （无）');
     }
+    L.push('');
 
     // ---- 结果 ----
     L.push('## 二、结果');
     L.push('');
-    var results = project.results || [];
+    var results = goal.results || [];
     if (!results.length) {
       L.push('（尚未记录结果）');
       L.push('');
@@ -172,77 +91,46 @@
     // ---- 事实 ----
     L.push('## 三、事实');
     L.push('');
-    var facts = (project.facts || []).filter(function (f) { return !f.mergedInto; });
-    facts.sort(function (a, b) { return String(a.timelineAt || '').localeCompare(String(b.timelineAt || '')); });
+    var facts = (goal.facts || []).slice().sort(function (a, b) {
+      return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
+    });
     if (!facts.length) {
       L.push('（尚未记录事实）');
       L.push('');
     } else {
-      L.push('| 时间 | 内容 | 关键 |');
-      L.push('| --- | --- | --- |');
+      L.push('| 时间 | 内容 |');
+      L.push('| --- | --- |');
       for (var f = 0; f < facts.length; f++) {
-        var fc = facts[f];
-        L.push('| ' + cell(fc.timelineAt) +
-          ' | ' + cell(fc.content) +
-          ' | ' + (fc.key ? '★' : '') + ' |');
+        L.push('| ' + cell(facts[f].timelineAt) + ' | ' + cell(facts[f].content) + ' |');
       }
       L.push('');
-      var keyFacts = facts.filter(function (x) { return x.key; });
-      if (keyFacts.length) {
-        L.push('### 关键事实');
-        L.push('');
-        for (var kf = 0; kf < keyFacts.length; kf++) {
-          L.push('- ' + (keyFacts[kf].content || '') +
-            (keyFacts[kf].timelineAt ? '　（' + keyFacts[kf].timelineAt + '）' : ''));
-        }
-        L.push('');
-      }
-      var anyContrib = false;
-      for (var fc2 = 0; fc2 < facts.length; fc2++) {
-        if (facts[fc2].contributors && facts[fc2].contributors.length) { anyContrib = true; break; }
-      }
-      if (anyContrib) {
-        L.push('### 合并的独立提交');
-        L.push('');
-        for (var fc3 = 0; fc3 < facts.length; fc3++) {
-          var main = facts[fc3];
-          if (!main.contributors || !main.contributors.length) continue;
-          L.push('- **主线事实**：' + (main.content || ''));
-          for (var ct = 0; ct < main.contributors.length; ct++) {
-            var con = main.contributors[ct];
-            L.push('  - 独立提交：' + (con.content || '') +
-              '　时间：' + fmtTime(con.createdAt));
-          }
-        }
-        L.push('');
-      }
     }
 
     // ---- 原因 ----
     L.push('## 四、原因');
     L.push('');
-    var causes = project.causes || [];
+    var causes = goal.causes || [];
     if (!causes.length) {
       L.push('（尚未归因）');
       L.push('');
     } else {
-      L.push('| 层级 | 原因 | 关联事实 |');
-      L.push('| --- | --- | --- |');
-      for (var c = 0; c < causes.length; c++) {
-        var cs = causes[c];
-        var linked = (cs.factIds || []).map(function (id) {
+      L.push('| 原因 | 关联事实 |');
+      L.push('| --- | --- |');
+      for (var cs = 0; cs < causes.length; cs++) {
+        var cause = causes[cs];
+        var linked = (cause.factIds || []).map(function (id) {
           for (var k = 0; k < facts.length; k++) { if (facts[k].id === id) return facts[k].content; }
           return '';
         }).filter(Boolean).join('；');
-        L.push('| ' + cell(cs.layer) + ' | ' + cell(cs.text) + ' | ' + cell(linked) + ' |');
+        L.push('| ' + cell(cause.text) + ' | ' + cell(linked) + ' |');
       }
       L.push('');
     }
 
-    // ---- 改进项 ----
-    L.push('## 五、改进项');
+    // ---- 改进措施 ----
+    L.push('## 五、改进措施');
     L.push('');
-    var actions = project.actions || [];
+    var actions = goal.actions || [];
     if (!actions.length) {
       L.push('（尚未制定改进）');
       L.push('');
@@ -255,9 +143,7 @@
         if (ac.status === 'open') statusText += '（**尚未闭环**）';
         var resText = ac.verifyResult ? ac.verifyResult : '（未填写）';
         if (ac.status === 'open') resText += '　——　**尚未闭环**';
-        L.push('| ' + cell(ac.title) +
-          ' | ' + statusText +
-          ' | ' + cell(resText) + ' |');
+        L.push('| ' + cell(ac.title) + ' | ' + statusText + ' | ' + cell(resText) + ' |');
       }
       L.push('');
       var open = actions.filter(function (x) { return x.status !== 'verified'; });
@@ -270,51 +156,57 @@
     // ---- 横向对比 ----
     L.push('## 六、横向对比');
     L.push('');
-    var linkedIds = project.linkedProjectIds || [];
+    var linkedIds = goal.linkedGoalIds || [];
     if (!linkedIds.length) {
-      L.push('（未关联历史复盘）');
+      L.push('（未关联历史目标）');
       L.push('');
     } else {
       for (var li = 0; li < linkedIds.length; li++) {
-        var other = projectById(allProjects, linkedIds[li]);
+        var other = goalById(allGoals, linkedIds[li]);
         if (!other) {
-          L.push('### ' + linkedIds[li] + '（项目不存在）');
+          L.push('### ' + linkedIds[li] + '（目标不存在）');
           L.push('');
           continue;
         }
-        L.push('### 与《' + other.title + '》对比');
+        L.push('### 对比《' + (other.goal.description || '（无目标描述）') + '》');
         L.push('');
-        var cmp = compare ? compare.compareProjects(project.id, other.id) : null;
-        if (cmp) {
-          L.push('- 目标愿望：本次「' + (cmp.goalDiff.currentWish || '—') + '」　上次「' + (cmp.goalDiff.otherWish || '—') + '」');
-          L.push('- 场景假设：本次「' + (cmp.goalDiff.currentScenario || '—') + '」　上次「' + (cmp.goalDiff.otherScenario || '—') + '」' +
-            (cmp.goalDiff.sameScenario ? '　（**场景假设未变**）' : ''));
-          L.push('');
-          L.push('**重复原因**');
-          L.push('');
-          if (cmp.repeatedCauses.length) {
-            for (var rc = 0; rc < cmp.repeatedCauses.length; rc++) {
-              var pair = cmp.repeatedCauses[rc];
-              L.push('- ⚠️ **重复原因**（相似度 ' + Math.round(pair.score * 100) + '%）：' +
-                '「' + pair.causeA.text + '」 ←→ 「' + pair.causeB.text + '」　（层级：' + pair.layer + '）');
-            }
-          } else {
-            L.push('- （未发现重复原因）');
+        var cmp = compare ? compare.compareGoals(goal.id, other.id) : null;
+        if (!cmp) continue;
+
+        L.push('**目标差异**');
+        L.push('');
+        L.push('- 本次目标：' + (cmp.goalDiff.currentDescription || '—'));
+        L.push('- 上次目标：' + (cmp.goalDiff.otherDescription || '—'));
+        L.push('- 本次验证标准：' + (cmp.goalDiff.currentCriteria || '—'));
+        L.push('- 上次验证标准：' + (cmp.goalDiff.otherCriteria || '—'));
+        L.push('');
+
+        L.push('**重复原因**');
+        L.push('');
+        if (cmp.repeatedCauses.length) {
+          for (var rp = 0; rp < cmp.repeatedCauses.length; rp++) {
+            var pair = cmp.repeatedCauses[rp];
+            L.push('- ⚠️ **重复原因**（相似度 ' + Math.round(pair.score * 100) + '%）：' +
+              '「' + pair.causeA.text + '」 ←→ 「' + pair.causeB.text + '」');
           }
-          L.push('');
-          L.push('**上次没闭环的改进**');
-          L.push('');
-          if (cmp.ineffectiveActions.length) {
-            for (var ic = 0; ic < cmp.ineffectiveActions.length; ic++) {
-              var ia = cmp.ineffectiveActions[ic];
-              L.push('- ⚠️ **' + (ia.failed ? '未生效' : '待验证') + '**（来自《' + ia.projectTitle + '》）：' + ia.action.title +
-                (ia.action.verifyResult ? '　验证结论：' + ia.action.verifyResult : ''));
-            }
-          } else {
-            L.push('- （历史改进均已闭环）');
-          }
-          L.push('');
+        } else {
+          L.push('- （未发现重复原因）');
         }
+        L.push('');
+
+        L.push('**上次没闭环的改进**');
+        L.push('');
+        if (cmp.ineffectiveActions.length) {
+          for (var ic = 0; ic < cmp.ineffectiveActions.length; ic++) {
+            var ia = cmp.ineffectiveActions[ic];
+            L.push('- ⚠️ **' + (ia.failed ? '未生效' : '待验证') + '**（来自《' + (ia.goalDescription || '（无目标描述）') + '》）：' +
+              ia.action.title +
+              (ia.action.verifyResult ? '　验证结论：' + ia.action.verifyResult : ''));
+          }
+        } else {
+          L.push('- （历史改进均已闭环）');
+        }
+        L.push('');
       }
     }
 
@@ -322,30 +214,23 @@
   }
 
   // 简短摘要：目标一句话 + 差距 + 关键原因 + 首要改进 + 状态
-  function buildSummary(project) {
-    if (!project) return '';
-    var store = R.store;
-    var cur = store ? store.getCurrentGoal(project.id) : null;
-    if (!cur && project.goal && project.goal.versions.length) cur = project.goal.versions[project.goal.versions.length - 1];
+  function buildSummary(goal) {
+    if (!goal) return '';
+    var goalLine = '目标：' + (goal.goal.description || '（未填写）') +
+      (goal.goal.criteria && goal.goal.criteria.length
+        ? '；验证标准：' + goal.goal.criteria[0] : '');
 
-    var goalLine = cur
-      ? ('目标：' + (cur.originalWish || '（未填写愿望）') +
-        (cur.scenarioHypothesis ? '；场景假设：' + cur.scenarioHypothesis : '') +
-        (cur.verificationCriteria && cur.verificationCriteria.length
-          ? '；验证标准：' + cur.verificationCriteria[0].text : ''))
-      : '目标：尚未定义';
-
-    var result = (project.results || [])[(project.results || []).length - 1];
+    var result = (goal.results || [])[(goal.results || []).length - 1];
     var gapLine = result
       ? ('差距：' + (result.gap || '（未填写差距）'))
       : '差距：尚未记录结果';
 
-    var causes = project.causes || [];
+    var causes = goal.causes || [];
     var causeLine = causes.length
-      ? ('关键原因：' + causes.map(function (c) { return '[' + c.layer + '] ' + c.text; }).join('；'))
+      ? ('关键原因：' + causes.map(function (c) { return c.text; }).join('；'))
       : '关键原因：尚未归因';
 
-    var actions = project.actions || [];
+    var actions = goal.actions || [];
     var pending = actions.filter(function (a) { return a.status !== 'verified'; });
     var actionLine;
     if (!actions.length) {
@@ -357,8 +242,8 @@
       actionLine = '首要改进：' + actions[0].title + '（已闭环）';
     }
 
-    var statusLine = '状态：' + (PROJECT_STATUS_CN[project.status] || '草稿') +
-      '　改进 ' + actions.filter(function (a) { return a.status === 'verified'; }).length + '/' + actions.length + ' 已闭环';
+    var statusLine = '改进 ' + actions.filter(function (a) { return a.status === 'verified'; }).length +
+      '/' + actions.length + ' 已闭环';
 
     return [goalLine, gapLine, causeLine, actionLine, statusLine].join('\n');
   }
@@ -368,8 +253,6 @@
     buildSummary: buildSummary,
     fmtTime: fmtTime,
     esc: esc,
-    ACTION_STATE_CN: ACTION_STATE_CN,
-    PROJECT_STATUS_CN: PROJECT_STATUS_CN,
-    TEMPLATE_CN: TEMPLATE_CN
+    ACTION_STATE_CN: ACTION_STATE_CN
   };
 })(window);

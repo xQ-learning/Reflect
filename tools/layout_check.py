@@ -93,18 +93,17 @@ def run(d):
     ZOOM = 500.0 / 360.0
 
     routes = [
-        ("#/projects", "项目列表"),
-        ("#/project/demo-prev-template/goal", "目标"),
-        ("#/project/demo-prev-template/result", "结果"),
-        ("#/project/demo-prev-template/facts", "事实"),
-        ("#/project/demo-prev-template/causes", "原因与改进"),
-        ("#/project/demo-prev-template/compare", "对比"),
-        ("#/project/demo-prev-template/export", "导出"),
-        # 当前示例项目数据更全，用来压两栏布局（目标/标准、事实/关键事实）
-        ("#/project/demo-current-clip/goal", "目标(全量)"),
-        ("#/project/demo-current-clip/facts", "事实(全量)"),
-        ("#/project/demo-current-clip/causes", "原因与改进(全量)"),
-        ("#/project/demo-current-clip/compare", "对比(全量)"),
+        ("#/goals", "目标列表"),
+        ("#/goal/new/goal", "创建目标"),
+        ("#/goal/demo-current-clip/goal", "目标"),
+        ("#/goal/demo-current-clip/result", "结果"),
+        ("#/goal/demo-current-clip/facts", "事实"),
+        ("#/goal/demo-current-clip/causes", "原因与改进"),
+        ("#/goal/demo-current-clip/compare", "对比"),
+        ("#/goal/demo-current-clip/export", "导出"),
+        # 上一个目标的数据，用来压对比面板
+        ("#/goal/demo-prev-template/goal", "目标(旧目标)"),
+        ("#/goal/demo-prev-template/compare", "对比(旧目标)"),
     ]
     print("\n[布局] 模拟 360px 手机视口 (zoom=%.2f)" % ZOOM)
     for hash_, label in routes:
@@ -126,9 +125,11 @@ def run(d):
             check("%s Tab 栏可横向滚动" % label, r["tabScrollable"],
                   "count=%s" % r.get("tabCount"))
 
-    # 向导弹层
-    print("\n[布局] 向导弹层")
-    d.execute("window.Reflect.wizard.open(null, {}); return true;")
+    # 补录验证弹层
+    print("\n[布局] 补录验证弹层")
+    d.execute("location.hash = '#/goal/demo-current-clip/causes'; return true;")
+    time.sleep(0.5)
+    d.execute("document.querySelector('[data-act=act-close]').click(); return true;")
     time.sleep(0.6)
     r = d.execute("""
       var m = document.querySelector('.modal');
@@ -138,10 +139,10 @@ def run(d):
               bottom: Math.round(r.bottom), winH: window.innerHeight, winW: window.innerWidth,
               scrollable: m.scrollHeight > m.clientHeight};
     """)
-    check("向导弹层已渲染", not r.get("no"), str(r))
-    check("向导弹层宽度不溢出", r["w"] <= r["winW"], str(r))
-    check("向导弹层纵向不超出视口", r["bottom"] <= r["winH"] + 2, str(r))
-    check("向导弹层内容可滚动", r["scrollable"] or r["h"] <= r["winH"], str(r))
+    check("补录验证弹层已渲染", not r.get("no"), str(r))
+    check("补录验证弹层宽度不溢出", r["w"] <= r["winW"], str(r))
+    check("补录验证弹层纵向不超出视口", r["bottom"] <= r["winH"] + 2, str(r))
+    check("补录验证弹层内容可滚动", r["scrollable"] or r["h"] <= r["winH"], str(r))
 
     # 文本对比度抽样
     print("\n[可读性]")
