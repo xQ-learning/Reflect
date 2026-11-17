@@ -99,13 +99,13 @@ adb install -r build/reflect.apk
 ## 测试
 
 ```bash
-python3 tools/acceptance_test.py   # 功能与验收测试（78 项）
+python3 tools/acceptance_test.py   # 功能与验收测试（88 项）
 python3 tools/layout_check.py       # 移动端布局体检（68 项）
 ```
 
 用 `geckodriver` 驱动 Firefox 真实渲染前端来断言，不是 mock：
 
-- `acceptance_test.py` —— 覆盖三条硬性验收、板块精简后的结构、导出内容、各页面渲染、控制台无报错
+- `acceptance_test.py` —— 覆盖三条硬性验收、板块精简后的结构、导出内容、各页面渲染、旧版本数据升级、控制台无报错
 - `layout_check.py` —— 在 360px 手机视口下检查触控目标 ≥40px、横向溢出、内容裁切、Tab 栏遮挡、WCAG AA 对比度
 
 > Firefox 窗口最小宽度 500px，布局测试用 CSS `zoom` 模拟 360px 视口以真实触发窄屏问题。

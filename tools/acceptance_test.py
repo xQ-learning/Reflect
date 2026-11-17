@@ -505,6 +505,67 @@ def run(d):
     errs = [l for l in d.logs("browser") if l.get("level") in ("SEVERE", "ERROR")]
     check("无 JS 运行时错误", not errs, json.dumps(errs[:3]) if errs else "")
 
+    # ---------- G. 旧版本数据升级 ----------
+    print("\n[G] 旧版本数据升级")
+    old_payload = json.dumps({
+        "version": 1,
+        "projects": [{
+            "id": "old-1", "title": "旧版本项目", "template": "standard", "status": "running",
+            "participants": ["张三"], "createdAt": 1700000000000, "updatedAt": 1700000000000,
+            "goal": {"currentVersion": 1, "versions": [
+                {"version": 1, "originalWish": "我要很爽", "basis": "b", "scenarioHypothesis": "s",
+                 "verificationCriteria": [{"text": "c1", "metric": "m", "threshold": "t"}],
+                 "adjustmentRule": "r", "note": "n", "createdAt": 1700000000000}]},
+            "results": [{"id": "r1", "actual": "a",
+                         "metrics": [{"name": "m1", "value": "1", "target": "2"}],
+                         "gap": "g", "author": "张三", "createdAt": 1700000000000}],
+            "facts": [{"id": "f1", "kind": "judgment", "content": "c",
+                       "timelineAt": "2026-01-01 10:00", "source": "src", "evidence": "ev",
+                       "confidence": "high", "status": "verified", "author": "李四",
+                       "mergedInto": None, "createdAt": 1700000000000}],
+            "causes": [{"id": "c1", "layer": "执行", "text": "t", "factIds": ["f1"],
+                        "createdAt": 1700000000000}],
+            "actions": [
+                {"id": "a1", "causeId": "c1", "title": "改", "owner": "张三",
+                 "due": "2026-12-01", "verifyMetric": "vm", "verifyResult": "",
+                 "status": "doing", "createdAt": 1700000000000},
+                {"id": "a2", "causeId": None, "title": "已验证的", "owner": None, "due": None,
+                 "verifyMetric": "vm2", "verifyResult": "好了", "status": "verified",
+                 "closedAt": 1700000000000, "createdAt": 1700000000000}],
+            "linkedProjectIds": []
+        }]
+    })
+    d.execute("localStorage.setItem('reflect.v1', arguments[0]); return true;", [old_payload])
+    d.execute("location.reload(); return true;")
+    time.sleep(1.8)
+    mig = d.execute("""
+      var p = window.Reflect.store.getProject('old-1');
+      if (!p) return {missing: true};
+      return {loaded: true,
+              fact: p.facts[0], result: p.results[0],
+              a1: p.actions[0], a2: p.actions[1]};
+    """)
+    check("旧版本数据能加载", mig.get("loaded") is True, str(mig)[:200])
+    if mig.get("loaded"):
+        f0 = mig["fact"]
+        check("旧事实只留内容/时间点/关键标记",
+              "kind" not in f0 and "source" not in f0 and "evidence" not in f0
+              and "confidence" not in f0 and "status" not in f0 and "author" not in f0
+              and f0.get("content") == "c" and f0.get("key") is False, str(f0))
+        check("旧结果去掉提交人", "author" not in mig["result"], str(mig["result"]))
+        check("旧改进去掉负责人与截止",
+              "owner" not in mig["a1"] and "due" not in mig["a1"], str(mig["a1"]))
+        check("旧「进行中」降级为「待验证」", mig["a1"]["status"] == "open", str(mig["a1"]))
+        check("旧「已验证」改进保持闭环",
+              mig["a2"]["status"] == "verified" and mig["a2"]["verifyResult"] == "好了", str(mig["a2"]))
+    for hash_ in ["#/project/old-1/goal", "#/project/old-1/facts", "#/project/old-1/causes"]:
+        d.execute("location.hash = arguments[0]; return true;", [hash_])
+        time.sleep(0.4)
+        n = d.execute("return document.body.innerText.trim().length;")
+        check("升级后页面 %s 正常渲染" % hash_, n > 10, "len=%d" % n)
+    errs2 = [l for l in d.logs("browser") if l.get("level") in ("SEVERE", "ERROR")]
+    check("升级后无 JS 运行时错误", not errs2, json.dumps(errs2[:3]) if errs2 else "")
+
     d.screenshot(os.path.join(SHOTS, "final.png"))
     print("\n" + "=" * 52)
     print("通过 %d / %d" % (len(PASS), len(PASS) + len(FAIL)))
