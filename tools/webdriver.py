@@ -2,15 +2,25 @@
 import base64
 import json
 import os
+import socket
 import subprocess
 import time
 import urllib.request
 
 
+def _free_port():
+    """随机取一个空闲端口，避免与残留的 geckodriver 冲突。"""
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
 class WebDriver:
-    def __init__(self, port=4444, headless=True):
-        self.port = port
-        self.base = "http://127.0.0.1:%d" % port
+    def __init__(self, port=None, headless=True):
+        self.port = port or _free_port()
+        self.base = "http://127.0.0.1:%d" % self.port
         self.proc = None
         self.sid = None
         self.headless = headless

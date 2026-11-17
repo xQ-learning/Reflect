@@ -156,21 +156,12 @@
 
   // ---- 各步渲染 ----
   function renderStep1() {
-    var vague = detectVague(state.wish);
     var h = '';
     h += '<div class="modal-sub">步骤 1 / 4　先写下你最初的愿望。模糊的愿望需要被翻译成可检验的标准。</div>';
     h += '<div class="steps"><i class="st on"></i><i class="st"></i><i class="st"></i><i class="st"></i></div>';
     h += '<label class="field"><span>原始愿望</span>' +
       '<textarea id="w-wish" placeholder="例：我要一个很爽的剪辑工具">' + esc(state.wish) + '</textarea></label>';
-    h += '<div class="row between small"><span class="muted">模糊度检测</span><span>' +
-      (vague.length
-        ? '<span class="badge alert">待翻译：命中「' + esc(vague.join('、')) + '」</span>'
-        : '<span class="badge verified">未命中常见模糊词</span>') +
-      '</span></div>';
-    if (vague.length) {
-      h += '<div class="alert-box" style="margin-top:10px">这个愿望里的「' + esc(vague.join('、')) +
-        '」无法直接检验。下一两步会把它翻译成「谁在什么场景下」+「可测量阈值」。</div>';
-    }
+    h += '<div id="w-vague"></div>';
     h += '<div class="modal-foot">' +
       '<button class="btn ghost" data-act="wiz-cancel">取消</button>' +
       '<button class="btn primary" data-act="wiz-next">下一步：选择场景</button>' +
@@ -245,8 +236,7 @@
     h += '<button class="btn sm" data-act="wiz-add-crit">+ 手写一条验证标准</button>';
 
     var okCount = confirmedCount();
-    h += '<div class="alert-box' + (okCount ? ' ok' : '') + '" style="margin-top:12px">已确认 <b>' + okCount + '</b> 条有效验证标准' +
-      (okCount ? '，可以进入下一步。' : '，<b>至少需要 1 条</b>（且写清判定口径）才能继续。') + '</div>';
+    h += '<div id="w-crit-alert"></div>';
 
     h += '<div class="modal-foot">' +
       '<button class="btn ghost" data-act="wiz-back">上一步</button>' +
@@ -306,6 +296,37 @@
     else if (state.step === 3) html = renderStep3();
     else html = renderStep4();
     root.innerHTML = '<div class="modal-mask" data-act="wiz-mask"><div class="modal">' + html + '</div></div>';
+    if (state.step === 1) paintVague();
+    if (state.step === 3) paintCritAlert();
+  }
+
+  // 步骤3 的"已确认 N 条"提示与下一步按钮：随口径编辑实时刷新
+  function paintCritAlert() {
+    var box = root && root.querySelector('#w-crit-alert');
+    if (!box) return;
+    var okCount = confirmedCount();
+    box.innerHTML = '<div class="alert-box' + (okCount ? ' ok' : '') + '" style="margin-top:12px">已确认 <b>' +
+      okCount + '</b> 条有效验证标准' +
+      (okCount ? '，可以进入下一步。' : '，<b>至少需要 1 条</b>（且写清判定口径）才能继续。') + '</div>';
+    var btn = root.querySelector('[data-act="wiz-next"]');
+    if (btn) btn.disabled = !okCount;
+  }
+
+  // 步骤1 的模糊度检测：随输入实时刷新，不重绘整个弹层（避免丢焦点）
+  function paintVague() {
+    var box = root && root.querySelector('#w-vague');
+    if (!box) return;
+    var vague = detectVague(state.wish);
+    var h = '<div class="row between small"><span class="muted">模糊度检测</span><span>' +
+      (vague.length
+        ? '<span class="badge alert">待翻译：命中「' + esc(vague.join('、')) + '」</span>'
+        : '<span class="badge verified">未命中常见模糊词</span>') +
+      '</span></div>';
+    if (vague.length) {
+      h += '<div class="alert-box" style="margin-top:10px">这个愿望里的「' + esc(vague.join('、')) +
+        '」无法直接检验。下一两步会把它翻译成「谁在什么场景下」+「可测量阈值」。</div>';
+    }
+    box.innerHTML = h;
   }
 
   function next() {
@@ -595,6 +616,12 @@
   function onInput(e) {
     if (!state) return;
     var t = e.target;
+    if (t.id === 'w-wish') {
+      // 愿望输入：更新状态并刷新模糊度徽标
+      state.wish = t.value;
+      paintVague();
+      return;
+    }
     var act = t.getAttribute ? t.getAttribute('data-act') : null;
     if (!act && t.closest) {
       var h = t.closest('[data-act]');
@@ -608,6 +635,7 @@
       if (act === 'wiz-crit-text') c2.text = t.value;
       else if (act === 'wiz-crit-metric') c2.metric = t.value;
       else c2.threshold = t.value;
+      if (state.step === 3) paintCritAlert();
     }
   }
 

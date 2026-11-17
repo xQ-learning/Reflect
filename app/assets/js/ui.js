@@ -499,8 +499,8 @@
         '<span class="grow"><span class="badge ' + kindCls + '">' + kindTxt + '</span> ' +
         '<span class="badge ' + f.confidence + '">置信度' + (f.confidence === 'high' ? '高' : f.confidence === 'low' ? '低' : '中') + '</span> ' +
         '<span class="badge ' + f.status + '">' + (f.status === 'verified' ? '已验证' : f.status === 'disputed' ? '有争议' : '待验证') + '</span></span>' +
-        '<input type="checkbox" class="sel-box" data-act="pick-fact" data-id="' + esc(f.id) + '"' +
-        (selectedFacts[f.id] ? ' checked' : '') + '>' +
+        '<label class="sel-wrap"><input type="checkbox" class="sel-box" data-act="pick-fact" data-id="' + esc(f.id) + '"' +
+        (selectedFacts[f.id] ? ' checked' : '') + '></label>' +
         '</div>' +
         '<div style="margin-top:6px;white-space:pre-wrap">' + esc(f.content) + '</div>' +
         '<div class="kv"><b>来源：</b>' + esc(f.source || '（未填写）') + '</div>' +
@@ -1173,8 +1173,8 @@
     if (!facts.length) { host.innerHTML = '<div class="muted small">暂无事实</div>'; return; }
     var h = '';
     for (var i = 0; i < facts.length; i++) {
-      h += '<label class="opt" style="display:inline-flex;align-items:center;gap:6px">' +
-        '<input type="checkbox" data-fid="' + esc(facts[i].id) + '">' +
+      h += '<label class="opt" style="display:inline-flex;align-items:center;gap:6px;min-height:44px">' +
+        '<input type="checkbox" class="sel-box" data-fid="' + esc(facts[i].id) + '">' +
         esc(String(facts[i].timelineAt || '').slice(5) + ' ' + facts[i].content.slice(0, 16)) +
         '</label>';
     }

@@ -12,6 +12,9 @@
   --muted: #93a0b3;
   --accent: #4d8dfa;
   --accent-soft: rgba(77, 141, 250, 0.14);
+  /* 实心按钮用的深色强调：对白字对比度 5.08:1，满足 WCAG AA */
+  --accent-solid: #2f6ad4;
+  --accent-solid-hover: #2a61c4;
   --ok: #35c48b;
   --warn: #e0a33e;
   --danger: #e05c5c;
@@ -86,7 +89,7 @@ button, input, select, textarea {
   align-items: center;
   justify-content: center;
   min-width: var(--tap);
-  min-height: 40px;
+  min-height: var(--tap);
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--card);
@@ -158,12 +161,13 @@ h1.page-title { font-size: 19px; margin: 4px 0 14px; }
 
 .btn:active { filter: brightness(.85); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.primary { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; font-weight: 600; }
+.btn.primary:hover { background: var(--accent-solid-hover); }
 .btn.ghost { background: transparent; }
 .btn.ok { border-color: rgba(53,196,139,.5); color: var(--ok); }
 .btn.warn { border-color: rgba(224,163,62,.5); color: var(--warn); }
 .btn.danger { border-color: rgba(224,92,92,.5); color: var(--danger); }
-.btn.sm { min-height: 34px; padding: 0 10px; font-size: 13px; border-radius: 9px; }
+.btn.sm { min-height: var(--tap); padding: 0 12px; font-size: 13px; border-radius: 9px; }
 .btn.block { width: 100%; }
 
 /* ---------- 表单 ---------- */
@@ -328,7 +332,17 @@ select { appearance: none; background-image: none; }
 .tl-time { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .tl-body { background: var(--card-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 
-.sel-box { width: 22px; height: 22px; accent-color: var(--accent); }
+/* 复选框：视觉 24px，用外层 .sel-wrap 把可点区域撑到 44px */
+.sel-box { width: 24px; height: 24px; accent-color: var(--accent); cursor: pointer; }
+.sel-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  margin: -12px;
+  cursor: pointer;
+}
 
 /* ---------- 列表项 ---------- */
 .item {
@@ -421,7 +435,7 @@ table.tbl th { color: var(--muted); font-weight: 500; background: var(--bg-soft)
 /* 选项按钮组 */
 .opts { display: flex; flex-wrap: wrap; gap: 8px; }
 .opt {
-  min-height: 40px;
+  min-height: var(--tap);
   padding: 0 12px;
   border-radius: 10px;
   border: 1px solid var(--line);
