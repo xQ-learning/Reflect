@@ -462,7 +462,17 @@ table.tbl th { color: var(--muted); font-weight: 500; background: var(--bg-soft)
 
 .modal h3 { margin: 0 0 4px; font-size: 16px; }
 .modal .modal-sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
-.modal-foot { display: flex; gap: 8px; margin-top: 14px; }
+/* 弹层底部操作条：内容变长时也始终够得着 */
+.modal-foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  position: sticky;
+  bottom: 0;
+  background: var(--card);
+  padding-top: 10px;
+  padding-bottom: 2px;
+}
 .modal-foot .btn { flex: 1; }
 
 /* 向导步骤条 */

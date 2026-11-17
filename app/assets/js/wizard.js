@@ -16,8 +16,7 @@
     { id: 'newbie-basic', label: '新手完成基础操作', who: '新手', where: '第一次使用', task: '完成一次核心操作' },
     { id: 'daily-quick', label: '日常快速记录', who: '普通用户', where: '日常随手记录', task: '在碎片时间里完成一次记录' },
     { id: 'pro-batch', label: '高频批量处理', who: '专业用户', where: '批量处理场景', task: '稳定完成一批任务' },
-    { id: 'team-collab', label: '团队协作评审', who: '团队成员', where: '多人协作评审', task: '完成一次协作交付' },
-    { id: 'custom', label: '自定义场景', who: '', where: '', task: '' }
+    { id: 'team-collab', label: '团队协作评审', who: '团队成员', where: '多人协作评审', task: '完成一次协作交付' }
   ];
 
   // 指标类型 → 阈值候选
@@ -157,22 +156,13 @@
   // ---- 各步渲染 ----
   function renderStep1() {
     var h = '';
-    h += '<div class="modal-sub">步骤 1 / 4　先写下你最初的愿望。模糊的愿望需要被翻译成可检验的标准。</div>';
-    h += '<div class="steps"><i class="st on"></i><i class="st"></i><i class="st"></i><i class="st"></i></div>';
-    h += '<label class="field"><span>原始愿望</span>' +
+    h += '<div class="modal-sub">步骤 1 / 2　写下目标描述。模糊的愿望会被翻译成可检验的标准。</div>';
+    h += '<div class="steps"><i class="st on"></i><i class="st"></i></div>';
+    h += '<label class="field"><span>目标描述</span>' +
       '<textarea id="w-wish" placeholder="例：我要一个很爽的剪辑工具">' + esc(state.wish) + '</textarea></label>';
     h += '<div id="w-vague"></div>';
-    h += '<div class="modal-foot">' +
-      '<button class="btn ghost" data-act="wiz-cancel">取消</button>' +
-      '<button class="btn primary" data-act="wiz-next">下一步：选择场景</button>' +
-      '</div>';
-    return h;
-  }
 
-  function renderStep2() {
-    var h = '';
-    h += '<div class="modal-sub">步骤 2 / 4　谁在什么场景下使用？把愿望落到具体的人和场景上。</div>';
-    h += '<div class="steps"><i class="st done"></i><i class="st on"></i><i class="st"></i><i class="st"></i></div>';
+    h += '<div class="muted small" style="margin-top:14px">场景假设（可选）</div>';
     h += '<div class="opts" id="w-scenarios">';
     for (var i = 0; i < SCENARIOS.length; i++) {
       var sc = SCENARIOS[i];
@@ -180,27 +170,24 @@
         '" data-act="wiz-scenario" data-id="' + sc.id + '">' + esc(sc.label) + '</button>';
     }
     h += '</div>';
-    h += '<label class="field" style="margin-top:12px"><span>使用者（谁）</span>' +
-      '<input type="text" id="w-who" value="' + esc(state.who) + '" placeholder="例：新手 / 剪辑师"></label>';
-    h += '<label class="field"><span>场景（在什么情况下）</span>' +
-      '<input type="text" id="w-where" value="' + esc(state.where) + '" placeholder="例：第一次剪视频"></label>';
-    h += '<label class="field"><span>要完成的任务</span>' +
-      '<input type="text" id="w-task" value="' + esc(state.task) + '" placeholder="例：产出一个可用的短视频"></label>';
-    h += '<label class="field"><span>场景假设草稿（可修改）</span>' +
-      '<textarea id="w-scenario-h" placeholder="例：新手在 10 分钟内产出一个可用的短视频">' + esc(state.scenarioHypothesis) + '</textarea></label>';
-    h += '<label class="field"><span>依据（为什么这么认为）</span>' +
+    h += '<label class="field" style="margin-top:10px"><span>场景假设</span>' +
+      '<textarea id="w-scenario-h" placeholder="例：新手在 10 分钟内产出一个可用的短视频">' +
+      esc(state.scenarioHypothesis) + '</textarea></label>';
+    h += '<label class="field"><span>依据（为什么这么认为，可选）</span>' +
       '<textarea id="w-basis" placeholder="例：3 位用户访谈都提到导出这一步最卡">' + esc(state.basis) + '</textarea></label>';
+
     h += '<div class="modal-foot">' +
-      '<button class="btn ghost" data-act="wiz-back">上一步</button>' +
-      '<button class="btn primary" data-act="wiz-next">下一步：选择验证标准</button>' +
+      '<button class="btn ghost" data-act="wiz-cancel">取消</button>' +
+      '<button class="btn primary" data-act="wiz-next">下一步：定验证标准</button>' +
       '</div>';
     return h;
   }
 
-  function renderStep3() {
+  function renderStep2() {
     var h = '';
-    h += '<div class="modal-sub">步骤 3 / 4　选择指标类型，系统给出阈值候选。<b>至少确认或改写 1 条</b>才能继续。</div>';
-    h += '<div class="steps"><i class="st done"></i><i class="st done"></i><i class="st on"></i><i class="st"></i></div>';
+    h += '<div class="modal-sub">步骤 2 / 2　定下验证标准。<b>至少确认 1 条</b>才能写入目标。</div>';
+    h += '<div class="steps"><i class="st done"></i><i class="st on"></i></div>';
+
     h += '<div class="opts" id="w-metrics">';
     for (var i = 0; i < METRIC_TYPES.length; i++) {
       var mt = METRIC_TYPES[i];
@@ -238,38 +225,15 @@
     var okCount = confirmedCount();
     h += '<div id="w-crit-alert"></div>';
 
-    h += '<div class="modal-foot">' +
-      '<button class="btn ghost" data-act="wiz-back">上一步</button>' +
-      '<button class="btn primary" data-act="wiz-next"' + (okCount ? '' : ' disabled') + '>下一步：汇总预览</button>' +
-      '</div>';
-    return h;
-  }
-
-  function renderStep4() {
-    var ok = confirmedCriteria();
-    var h = '';
-    h += '<div class="modal-sub">步骤 4 / 4　汇总确认。写入后将生成目标版本' +
-      (state.projectId ? '（新版本，旧版本保留）' : '') + '。</div>';
-    h += '<div class="steps"><i class="st done"></i><i class="st done"></i><i class="st done"></i><i class="st on"></i></div>';
-
-    h += '<div class="item"><div class="item-t">原始愿望</div><div class="kv">' + esc(state.wish || '（未填写）') + '</div></div>';
-    h += '<div class="item"><div class="item-t">依据</div><div class="kv">' + esc(state.basis || '（未填写）') + '</div></div>';
-    h += '<div class="item"><div class="item-t">场景假设</div><div class="kv">' + esc(state.scenarioHypothesis || '（未填写）') + '</div></div>';
-    h += '<div class="item"><div class="item-t">验证标准（' + ok.length + ' 条）</div>';
-    for (var i = 0; i < ok.length; i++) {
-      h += '<div class="kv">· ' + esc(ok[i].text) +
-        (ok[i].metric ? '　指标：' + esc(ok[i].metric) : '') +
-        (ok[i].threshold ? '　阈值：' + esc(ok[i].threshold) : '') + '</div>';
-    }
-    h += '</div>';
-    h += '<label class="field"><span>调整规则（满足什么条件就修正目标）</span>' +
+    h += '<label class="field" style="margin-top:14px"><span>调整规则（满足什么条件就修正目标，可选）</span>' +
       '<textarea id="w-adjust" placeholder="例：若 5 人测试中完成率 < 60%，则把目标修正为「新手 15 分钟内出片」">' +
       esc(state.adjustmentRule) + '</textarea></label>';
     h += '<label class="field"><span>本次修订说明</span>' +
       '<input type="text" id="w-note" value="' + esc(state.note) + '" placeholder="例：把模糊愿望翻译为可检验标准"></label>';
+
     h += '<div class="modal-foot">' +
       '<button class="btn ghost" data-act="wiz-back">上一步</button>' +
-      '<button class="btn primary" data-act="wiz-submit">写入目标</button>' +
+      '<button class="btn primary" data-act="wiz-submit"' + (okCount ? '' : ' disabled') + '>写入目标</button>' +
       '</div>';
     return h;
   }
@@ -292,23 +256,21 @@
     ensureRoot();
     var html = '';
     if (state.step === 1) html = renderStep1();
-    else if (state.step === 2) html = renderStep2();
-    else if (state.step === 3) html = renderStep3();
-    else html = renderStep4();
+    else html = renderStep2();
     root.innerHTML = '<div class="modal-mask" data-act="wiz-mask"><div class="modal">' + html + '</div></div>';
     if (state.step === 1) paintVague();
-    if (state.step === 3) paintCritAlert();
+    if (state.step === 2) paintCritAlert();
   }
 
-  // 步骤3 的"已确认 N 条"提示与下一步按钮：随口径编辑实时刷新
+  // 步骤2 的"已确认 N 条"提示与写入按钮：随口径编辑实时刷新
   function paintCritAlert() {
     var box = root && root.querySelector('#w-crit-alert');
     if (!box) return;
     var okCount = confirmedCount();
     box.innerHTML = '<div class="alert-box' + (okCount ? ' ok' : '') + '" style="margin-top:12px">已确认 <b>' +
       okCount + '</b> 条有效验证标准' +
-      (okCount ? '，可以进入下一步。' : '，<b>至少需要 1 条</b>（且写清判定口径）才能继续。') + '</div>';
-    var btn = root.querySelector('[data-act="wiz-next"]');
+      (okCount ? '，可以写入目标。' : '，<b>至少需要 1 条</b>（且写清判定口径）才能写入。') + '</div>';
+    var btn = root.querySelector('[data-act="wiz-submit"]');
     if (btn) btn.disabled = !okCount;
   }
 
@@ -324,41 +286,24 @@
       '</span></div>';
     if (vague.length) {
       h += '<div class="alert-box" style="margin-top:10px">这个愿望里的「' + esc(vague.join('、')) +
-        '」无法直接检验。下一两步会把它翻译成「谁在什么场景下」+「可测量阈值」。</div>';
+        '」无法直接检验。下一步会把它翻译成「谁在什么场景下」+「可测量阈值」。</div>';
     }
     box.innerHTML = h;
   }
 
   function next() {
-    if (state.step === 1) {
-      state.wish = val('#w-wish');
-      if (!state.wish.trim()) { R.ui.toast('请先写下原始愿望', 'err'); return; }
-      state.step = 2; paint(); return;
-    }
-    if (state.step === 2) {
-      state.who = val('#w-who');
-      state.where = val('#w-where');
-      state.task = val('#w-task');
-      state.scenarioHypothesis = val('#w-scenario-h');
-      state.basis = val('#w-basis');
-      if (!state.scenarioHypothesis.trim()) {
-        // 没有草稿就用场景模板兜底
-        for (var i = 0; i < SCENARIOS.length; i++) {
-          if (SCENARIOS[i].id === state.scenarioId) state.scenarioHypothesis = scenarioDraft(SCENARIOS[i]);
-        }
+    if (state.step !== 1) return;
+    state.wish = val('#w-wish');
+    if (!state.wish.trim()) { R.ui.toast('请先写下目标描述', 'err'); return; }
+    state.scenarioHypothesis = val('#w-scenario-h');
+    state.basis = val('#w-basis');
+    if (!state.scenarioHypothesis.trim()) {
+      // 没填就用场景模板兜底
+      for (var i = 0; i < SCENARIOS.length; i++) {
+        if (SCENARIOS[i].id === state.scenarioId) state.scenarioHypothesis = scenarioDraft(SCENARIOS[i]);
       }
-      if (!state.scenarioHypothesis.trim()) {
-        R.ui.toast('请填写场景假设，或选择一个场景模板', 'err'); return;
-      }
-      state.step = 3; paint(); return;
     }
-    if (state.step === 3) {
-      var ok = confirmedCriteria();
-      if (!ok.length) {
-        R.ui.toast('至少需要确认 1 条验证标准（含判定口径）', 'err'); return;
-      }
-      state.step = 4; paint(); return;
-    }
+    state.step = 2; paint(); return;
   }
 
   function back() {
@@ -403,13 +348,7 @@
     if (actEl === 'wiz-scenario') {
       state.scenarioId = id;
       for (var i = 0; i < SCENARIOS.length; i++) {
-        if (SCENARIOS[i].id === id) {
-          var sc = SCENARIOS[i];
-          if (sc.id !== 'custom') {
-            state.who = sc.who; state.where = sc.where; state.task = sc.task;
-            state.scenarioHypothesis = scenarioDraft(sc);
-          }
-        }
+        if (SCENARIOS[i].id === id) state.scenarioHypothesis = scenarioDraft(SCENARIOS[i]);
       }
       paint(); return;
     }
@@ -498,14 +437,14 @@
     // ---- 强制校验点 1：至少 1 条有效验证标准 ----
     if (!list.length) {
       R.ui.toast('至少需要 1 条有效验证标准才能写入目标', 'err');
-      state.step = 3; paint();
+      state.step = 2; paint();
       return;
     }
     // ---- 强制校验点 2：每条 text 非空 ----
     for (var i = 0; i < list.length; i++) {
       if (!String(list[i].text || '').trim()) {
         R.ui.toast('验证标准的口径不能为空', 'err');
-        state.step = 3; paint();
+        state.step = 2; paint();
         return;
       }
     }
@@ -521,7 +460,7 @@
     var check = R.store.validateCriteria(payloadCriteria);
     if (!check.ok) {
       R.ui.toast(check.error, 'err');
-      state.step = 3; paint();
+      state.step = 2; paint();
       return;
     }
 
@@ -566,9 +505,6 @@
       onDone: opts.onDone || null,
       wish: '',
       basis: '',
-      who: '',
-      where: '',
-      task: '',
       scenarioId: '',
       scenarioHypothesis: '',
       metricTypeId: '',
@@ -585,9 +521,6 @@
         state.basis = cur.basis || '';
         state.scenarioHypothesis = cur.scenarioHypothesis || '';
         state.adjustmentRule = cur.adjustmentRule || '';
-        state.who = '';
-        state.where = '';
-        state.task = '';
         state.criteria = cur.verificationCriteria.map(function (c, i) {
           return {
             id: 'r' + i + '_' + Math.random().toString(36).slice(2, 6),
@@ -597,7 +530,7 @@
         });
         if (state.criteria.length) state.metricTypeId = '';
       }
-      state.step = 2;
+      state.step = 1;
       state.note = state.note || '修订目标版本';
     }
 
@@ -617,11 +550,15 @@
     if (!state) return;
     var t = e.target;
     if (t.id === 'w-wish') {
-      // 愿望输入：更新状态并刷新模糊度徽标
+      // 目标描述输入：更新状态并刷新模糊度徽标
       state.wish = t.value;
       paintVague();
       return;
     }
+    if (t.id === 'w-scenario-h') { state.scenarioHypothesis = t.value; return; }
+    if (t.id === 'w-basis') { state.basis = t.value; return; }
+    if (t.id === 'w-adjust') { state.adjustmentRule = t.value; return; }
+    if (t.id === 'w-note') { state.note = t.value; return; }
     var act = t.getAttribute ? t.getAttribute('data-act') : null;
     if (!act && t.closest) {
       var h = t.closest('[data-act]');
@@ -635,7 +572,7 @@
       if (act === 'wiz-crit-text') c2.text = t.value;
       else if (act === 'wiz-crit-metric') c2.metric = t.value;
       else c2.threshold = t.value;
-      if (state.step === 3) paintCritAlert();
+      if (state.step === 2) paintCritAlert();
     }
   }
 

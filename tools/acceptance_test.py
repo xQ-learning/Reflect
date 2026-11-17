@@ -83,10 +83,20 @@ def run(d):
     d.execute("window.Reflect.store.seedExample(); return true;")
     time.sleep(0.5)
 
-    # 走真实向导：步骤1 输入模糊愿望
+    # 走真实向导：两步 —— 目标描述 → 验证标准
     d.execute("window.Reflect.wizard.open(null, {onDone: function(){}}); return true;")
     time.sleep(0.6)
     d.screenshot(os.path.join(SHOTS, "a1-wizard-step1.png"))
+    steps = d.execute("""
+      var m = document.querySelector('.modal');
+      return {dots: m.querySelectorAll('.steps .st').length,
+              sub: m.querySelector('.modal-sub').textContent,
+              hasWish: !!document.getElementById('w-wish'),
+              hasNext: !!m.querySelector('[data-act=wiz-next]')};
+    """)
+    check("向导只有两步", steps["dots"] == 2, str(steps))
+    check("步骤1 是「目标描述」", "目标描述" in steps["sub"] and steps["hasWish"], str(steps))
+
     d.execute("""
       var w = document.getElementById('w-wish');
       if (!w) return false;
@@ -103,36 +113,33 @@ def run(d):
     check("向导检测出模糊愿望并标记待翻译", blurry)
     d.screenshot(os.path.join(SHOTS, "a2-wizard-blurry.png"))
 
-    # 步骤1 → 步骤2
+    # 步骤1 → 步骤2（验证标准）
     d.execute("document.querySelector('.modal [data-act=wiz-next]').click(); return true;")
     time.sleep(0.4)
-    step2 = d.execute("return !!document.getElementById('w-scenario-h')")
-    check("向导可进入步骤2（场景）", step2)
-
-    # 步骤2 填场景假设 → 步骤3
-    d.execute("""
-      var s = document.getElementById('w-scenario-h');
-      s.value = '新手 10 分钟出片';
-      s.dispatchEvent(new Event('input', {bubbles:true}));
-      document.querySelector('.modal [data-act=wiz-next]').click();
-      return true;
+    step2 = d.execute("""
+      var m = document.querySelector('.modal');
+      return {hasMetrics: !!document.getElementById('w-metrics'),
+              hasSubmit: !!m.querySelector('[data-act=wiz-submit]'),
+              hasSummary: !!document.getElementById('w-metrics') && !!m.querySelector('[data-act=wiz-next]'),
+              sub: m.querySelector('.modal-sub').textContent};
     """)
-    time.sleep(0.4)
-    step3 = d.execute("return !!document.getElementById('w-metrics')")
-    check("向导可进入步骤3（验证标准）", step3)
+    check("向导可进入步骤2（验证标准）", step2["hasMetrics"], str(step2))
+    check("步骤2 直接给出写入按钮，不再有汇总预览步",
+          step2["hasSubmit"] and not step2["hasSummary"], str(step2))
+    check("步骤2 标题是「验证标准」", "验证标准" in step2["sub"], str(step2))
 
-    # 步骤3 关键校验点：没有确认任何验证标准时，下一步必须被禁用
+    # 步骤2 关键校验点：没有确认任何验证标准时，写入必须被禁用
     guard = d.execute("""
       var m = document.querySelector('.modal');
-      var btn = m.querySelector('[data-act=wiz-next]');
+      var btn = m.querySelector('[data-act=wiz-submit]');
       var box = document.querySelector('.modal input[type=checkbox]');
       return {hasBtn: !!btn, disabled: btn ? !!btn.disabled : false,
               hasCheckbox: !!box,
               alert: m.textContent.indexOf('至少需要 1 条') >= 0};
     """)
-    check("步骤3 在无验证标准时禁用下一步",
+    check("步骤2 在无验证标准时禁用写入按钮",
           guard["hasBtn"] and guard["disabled"], str(guard))
-    check("步骤3 明确提示至少需要 1 条验证标准", guard["alert"], str(guard))
+    check("步骤2 明确提示至少需要 1 条验证标准", guard["alert"], str(guard))
 
     # 选一个指标类型 → 系统给出带阈值的候选口径
     metric = d.execute("""
@@ -146,14 +153,14 @@ def run(d):
       var m = document.querySelector('.modal');
       return {hasCrit: !!document.querySelector('.modal .crit'),
               hasThreshold: !!document.querySelector('.modal [data-act=wiz-crit-threshold]'),
-              nextDisabled: document.querySelector('.modal [data-act=wiz-next]').disabled,
+              submitDisabled: document.querySelector('.modal [data-act=wiz-submit]').disabled,
               alertText: m.textContent.replace(/\\s+/g,' ').slice(-120)};
     """)
     check("选择指标类型后生成候选验证标准", cand["hasCrit"], str(cand))
     check("候选标准自带阈值口径", cand["hasThreshold"], str(cand))
-    check("候选未确认时下一步仍禁用", cand["nextDisabled"] is True, str(cand))
+    check("候选未确认时写入按钮仍禁用", cand["submitDisabled"] is True, str(cand))
 
-    # 勾选 + 填口径后应可继续
+    # 勾选 + 填口径后应可写入
     d.execute("""
       var box = document.querySelector('.modal input[type=checkbox]');
       if (!box) return 'NO_CHECKBOX';
@@ -166,16 +173,11 @@ def run(d):
     """)
     time.sleep(0.4)
     after = d.execute("""
-      var btn = document.querySelector('.modal [data-act=wiz-next]');
+      var btn = document.querySelector('.modal [data-act=wiz-submit]');
       return {disabled: btn ? !!btn.disabled : true};
     """)
     check("确认并填写口径后解除禁用", after["disabled"] is False, str(after))
-
-    d.execute("document.querySelector('.modal [data-act=wiz-next]').click(); return true;")
-    time.sleep(0.4)
-    step4 = d.execute("return !!document.querySelector('.modal [data-act=wiz-submit]')")
-    check("向导可进入步骤4（汇总预览）", step4)
-    d.screenshot(os.path.join(SHOTS, "a3-wizard-step4.png"))
+    d.screenshot(os.path.join(SHOTS, "a3-wizard-step2.png"))
 
     # 写入目标，验证真的落库
     write = d.execute("""
@@ -192,9 +194,8 @@ def run(d):
     """)
     time.sleep(0.4)
     check("向导写入新项目", write["after"] == write["before"] + 1, str(write))
-    check("写入后愿望保持原样", "很爽" in write["wish"], str(write["wish"]))
+    check("写入后目标描述保持原样", "很爽" in write["wish"], str(write["wish"]))
     check("写入后至少有 1 条验证标准", write["criteria"] >= 1, str(write))
-    check("写入后场景假设保留", "10 分钟出片" in write["scenario"], str(write["scenario"]))
     check("写入的验证标准带阈值", bool(write["first"] and write["first"].get("threshold")),
           str(write["first"]))
 

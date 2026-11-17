@@ -321,7 +321,7 @@
 
     if (!cur) {
       h += '<div class="empty"><div class="e-t">还没有目标</div>' +
-        '<div>点「翻译愿望为验证标准」，用向导把「我要很爽」变成可检验的标准。</div>' +
+        '<div>点「翻译愿望」，两步把「我要很爽」变成可检验的标准。</div>' +
         '<button class="btn primary" style="margin-top:12px" data-act="wizard">开始翻译</button></div>';
       h += '</div>';
       return h;
