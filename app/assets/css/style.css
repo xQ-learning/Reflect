@@ -1,47 +1,53 @@
-/* Reflect 复盘 — 冷调玻璃主题（极光 / 磨砂 / 青紫）
+/* Reflect 复盘 — 暗金 / 复古卷轴主题
    目标：手机竖屏 + 桌面浏览器均可用的响应式卡片布局
    约定：所有图标为内联 SVG / 字符，无任何外部资源
-   配色：深蓝黑底 + 玻璃卡片 + 青色 / 紫色点缀，正文不用纯白
-   层级：靠光影（弥散影 + 顶边反光 + 背景模糊），不靠生硬的彩色线框 */
+   配色：墨蓝底 + 羊皮纸字 + 暗金点缀，正文不用纯白 */
 
 :root {
-  /* 背景：深蓝黑。底下埋两团极淡的极光（青 / 紫），给玻璃一个可以折射的东西 */
-  --bg: #080a10;
-  --bg-top: #10141f;
-  --bg-soft: #0c0f16;          /* 输入框内底 */
-  /* 卡片：玻璃 —— 半透明 + 背景模糊，靠光影分层，不靠描边 */
-  --card: rgba(255, 255, 255, .045);
-  --card-2: rgba(255, 255, 255, .028);
-  --line: rgba(255, 255, 255, .07);
-  /* 文字：白 / 冷灰 */
-  --text: #f1f4f9;
-  --text-dim: #a7b0c0;
-  --muted: #828c9e;
-  --faint: #4a5468;
-  /* 强调：青（主）+ 紫（次），只做小面积点缀 */
-  --cyan: #7fe3f2;
-  --cyan-hi: #b4f1fb;
-  --cyan-deep: #45b9ce;
-  --cyan-soft: rgba(127, 227, 242, .12);
-  --cyan-line: rgba(127, 227, 242, .30);
-  --violet: #a78bfa;
-  --violet-hi: #c9bcfd;
-  --violet-soft: rgba(167, 139, 250, .12);
-  --violet-line: rgba(167, 139, 250, .30);
-  /* 语义色：同样收敛到冷调 */
-  --danger: #f87171;
-  --danger-text: #fda4af;
-  --ok: #34d399;
-  --ok-text: #6ee7b7;
-  --warn: #a78bfa;              /* 平平 / 待验证 → 紫 */
-  --warn-text: #c4b5fd;
-  --neutral: #8b95a8;
-  --radius: 16px;
+  /* 背景层：黑曜石 #0B0C10，纯净无网格，给眼睛留白 */
+  --bg: #0b0c10;
+  --bg-top: #101218;
+  --bg-soft: #0f1014;          /* 输入框内底：比卡片暗，暗示「可以在此书写」 */
+  /* 卡片层：深岩灰，比底色略亮，产生层级 */
+  --card: #15171e;
+  --card-2: #191c24;          /* 内嵌块 */
+  --line: rgba(255, 255, 255, .08);   /* 所有描边都是半透明极细线 */
+  /* 文字层：钛白 / 银灰 / 暗灰 */
+  --text: #f3f4f6;            /* 钛白，不用纯白 */
+  --text-dim: #9ca3af;        /* 银灰：正文段落 */
+  --muted: #868b95;           /* 暗灰：次要提示（文字版，AA 安全） */
+  --faint: #4b5563;           /* 更暗的灰：只给图标和分隔线用 */
+  /* 强调色：香槟金。极小面积使用（文字 / 细边框 / 图标 / 进度条） */
+  --gold: #c5a880;
+  --gold-hi: #d4af37;
+  --gold-deep: #7a5f34;
+  --gold-soft: rgba(197, 168, 128, .10);
+  --gold-line: rgba(197, 168, 128, .42);
+  --accent: #c5a880;
+  --accent-soft: rgba(197, 168, 128, .10);
+  --accent-solid: #b89668;
+  --accent-solid-hover: #a8885c;
+  /* 金属高光：顶边倒角那一道比边框亮一档的镜面反光 */
+  --bevel: rgba(255, 255, 255, .12);
+  --bevel-soft: rgba(255, 255, 255, .07);
+  /* 暗金渐变：金属块的受光面（上亮下暗），替代平涂色块 */
+  --metal-face: linear-gradient(180deg, rgba(229, 192, 123, .16), rgba(176, 128, 68, .07) 55%, rgba(229, 192, 123, .04));
+  --metal-edge: rgba(229, 192, 123, .40);
+  --metal-glow: rgba(229, 192, 123, .22);
+  --metal-text: #e5c07b;
+  /* 辅助状态色：暗红 / 翡翠绿 / 琥珀黄 */
+  --danger: #e02424;          /* 填充、边框、图标 */
+  --danger-text: #f87171;     /* 小字号文本用同色系亮一档，够 AA */
+  --ok: #059669;              /* 填充、边框、图标 */
+  --ok-text: #10b981;         /* 小字号文本用同色系亮一档，够 AA */
+  --warn: #d97706;
+  --warn-text: #d4af37;       /* 琥珀黄在暗底上偏暗，文字改用香槟金 */
+  --neutral: #6b7280;
+  --radius: 14px;
   --tap: 44px;
   --tabbar-h: 60px;
-  /* 层级靠光影：外层弥散影 + 顶边一道玻璃反光 */
-  --lift: 0 10px 30px rgba(3, 6, 14, .55), 0 1px 0 rgba(255, 255, 255, .07) inset;
-  --glass: blur(20px) saturate(150%);
+  /* 卡片悬浮感：不描实线边框，用极弱的弥散阴影 + 顶边一道反光 */
+  --lift: 0 4px 20px rgba(0, 0, 0, .4), 0 1px 0 rgba(255, 255, 255, .04) inset;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -51,11 +57,7 @@ html, body {
   padding: 0;
   /* 底色就是一层渐变：从顶部深石板到底部近黑，没有任何网格或噪点 */
   background-color: var(--bg);
-  /* 底下两团极淡的极光（青 / 紫），页面上的玻璃靠它们产生折射感 */
-  background-image:
-    radial-gradient(92% 52% at 10% -10%, rgba(70, 170, 255, .17), transparent 62%),
-    radial-gradient(78% 46% at 92% 2%, rgba(150, 120, 255, .15), transparent 64%),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 52%, #06070b 100%);
+  background-image: linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 46%, #0a0b0e 100%);
   background-attachment: fixed;
   color: var(--text);
   font-size: 15px;
@@ -94,11 +96,11 @@ button, input, select, textarea {
   min-height: 52px;
   padding: 8px 12px;
   padding-top: calc(8px + env(safe-area-inset-top, 0px));
-  background: linear-gradient(180deg, rgba(14, 18, 28, .72), rgba(9, 11, 17, .78));
+  background:
+    linear-gradient(180deg, rgba(18, 20, 25, .96), rgba(12, 13, 17, .96));
   border-bottom: 1px solid rgba(255, 255, 255, .06);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .04), 0 10px 26px rgba(0, 0, 0, .40);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .04), 0 8px 20px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(10px);
 }
 
 .appbar .title {
@@ -141,17 +143,17 @@ button, input, select, textarea {
 }
 
 .card {
-  /* 卡片：一块玻璃 —— 半透明 + 背景模糊，顶边一道反光，底下弥散影 */
+  /* 卡片：深岩灰实底 + 顶边一道极弱反光，不描实线边框，靠弥散阴影悬浮 */
   background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 38%);
-  border: 1px solid var(--line);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 34%);
+  border: 0;
   border-radius: var(--radius);
   padding: 14px;
   margin-bottom: 12px;
   box-shadow: var(--lift);
 }
+
+/* 金属倒角的统一规则放在文件末尾，避免被后面各组件的简写覆盖 */
 
 .card > h2, .card > h3 {
   margin: 0 0 10px;
@@ -189,30 +191,28 @@ h1.page-title { font-size: 19px; margin: 4px 0 14px; }
   gap: 6px;
   min-height: var(--tap);
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: 11px;
   border: 1px solid var(--line);
-  background-color: rgba(255, 255, 255, .04);
+  background-color: rgba(255, 255, 255, .03);
   color: var(--text);
   cursor: pointer;
   font-size: 14.5px;
-  transition: filter .15s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  transition: filter .15s ease, transform .15s ease, box-shadow .2s ease, background-color .2s ease;
 }
 
 .btn:active { filter: brightness(.85); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-/* 主按钮：青紫渐变的玻璃胶囊，靠光晕立起来，不是一块死色 */
+/* 主按钮：幽灵按钮 —— 深色底 + 香槟金文字 + 1px 香槟金细边框，不做大金块 */
 .btn.primary {
-  background-image: linear-gradient(135deg, rgba(127, 227, 242, .20), rgba(167, 139, 250, .22));
-  border-color: rgba(150, 220, 255, .38);
-  color: #eafbff;
+  background-color: rgba(197, 168, 128, .06);
+  border-color: var(--gold-line);
+  color: var(--gold);
   font-weight: 600;
-  box-shadow: 0 8px 24px rgba(70, 160, 255, .18), inset 0 1px 0 rgba(255, 255, 255, .16);
+  box-shadow: none;
 }
 .btn.primary:hover {
-  background-image: linear-gradient(135deg, rgba(127, 227, 242, .30), rgba(167, 139, 250, .32));
-  border-color: rgba(160, 225, 255, .55);
+  background-color: rgba(197, 168, 128, .12);
+  border-color: rgba(197, 168, 128, .72);
 }
 /* 次按钮：纯文字，无外框 */
 .btn.ghost {
@@ -222,12 +222,12 @@ h1.page-title { font-size: 19px; margin: 4px 0 14px; }
 }
 .btn.ghost:hover { color: var(--text); }
 /* 次按钮：暗灰文字，无外框，前面带 + 号 */
-.btn.soft {
+.btn.gold {
   border-color: transparent;
   color: var(--muted);
   background-color: transparent;
 }
-.btn.soft:hover { color: var(--cyan); }
+.btn.gold:hover { color: var(--gold); }
 .btn.ok { border-color: var(--line); color: var(--ok-text); }
 .btn.warn { border-color: var(--line); color: var(--warn-text); }
 .btn.danger { border-color: var(--line); color: var(--danger-text); }
@@ -249,17 +249,17 @@ input[type=text], input[type=date], input[type=number], input[type=datetime-loca
   min-height: var(--tap);
   padding: 10px 12px;
   border-radius: 11px;
-  /* 输入框：深色内底 + 一根半透明极细线 */
+  /* 输入框：深空灰内底 + 一根半透明极细线 */
   border: 1px solid var(--line);
-  background-color: rgba(255, 255, 255, .025);
+  background-color: var(--bg-soft);
   color: var(--text);
   outline: none;
 }
 
-/* 聚焦：细线框亮成青色 */
+/* 聚焦：细线框高亮成香槟金 */
 input:focus, select:focus, textarea:focus {
-  border-color: rgba(127, 227, 242, .55);
-  box-shadow: 0 0 0 3px rgba(127, 227, 242, .10), 0 0 18px rgba(70, 170, 255, .12);
+  border-color: rgba(212, 175, 55, .7);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, .10);
 }
 
 /* 行内书写：透明底 + 一条底部下划线，不要实心大白块 */
@@ -271,8 +271,8 @@ input.uline, textarea.uline {
   padding: 6px 2px;
 }
 input.uline:focus, textarea.uline:focus {
-  border-bottom-color: rgba(127, 227, 242, .75);
-  box-shadow: 0 0 14px rgba(70, 170, 255, .14);
+  border-bottom-color: rgba(212, 175, 55, .8);
+  box-shadow: none;
 }
 textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
 #f-content { border-style: dashed; }
@@ -298,40 +298,38 @@ select { appearance: none; background-image: none; }
   white-space: nowrap;
 }
 
-.badge.fact { color: var(--ok-text); background: rgba(52, 211, 153, .10); }
-.badge.judgment { color: var(--warn-text); background: rgba(167, 139, 250, .10); }
-.badge.emotion { color: var(--neutral); background: rgba(139, 149, 168, .12); }
+.badge.fact { color: var(--ok-text); background: rgba(5, 150, 105, .10); }
+.badge.judgment { color: var(--warn-text); background: rgba(212, 175, 55, .10); }
+.badge.emotion { color: var(--neutral); background: rgba(107, 114, 128, .12); }
 .badge.high { color: var(--ok-text); }
 .badge.medium { color: var(--warn-text); }
 .badge.low { color: var(--muted); }
-.badge.verified { color: var(--ok-text); background: rgba(52, 211, 153, .10); }
-.badge.pending { color: var(--warn-text); background: rgba(167, 139, 250, .10); }
-.badge.disputed { color: var(--danger-text); background: rgba(248, 113, 113, .10); }
+.badge.verified { color: var(--ok-text); background: rgba(5, 150, 105, .10); }
+.badge.pending { color: var(--warn-text); background: rgba(212, 175, 55, .10); }
+.badge.disputed { color: var(--danger-text); background: rgba(224, 36, 36, .10); }
 .badge.open { color: var(--muted); }
-.badge.doing { color: var(--cyan); background: rgba(127, 227, 242, .10); }
-.badge.failed { color: var(--danger-text); background: rgba(248, 113, 113, .10); }
+.badge.doing { color: var(--gold); background: rgba(197, 168, 128, .10); }
+.badge.failed { color: var(--danger-text); background: rgba(224, 36, 36, .10); }
 .badge.draft { color: var(--muted); }
-.badge.running { color: var(--cyan); background: rgba(127, 227, 242, .10); }
-.badge.archived { color: var(--neutral); background: rgba(139, 149, 168, .12); }
-.badge.revised { color: var(--warn-text); background: rgba(167, 139, 250, .10); }
+.badge.running { color: var(--gold); background: rgba(197, 168, 128, .10); }
+.badge.archived { color: var(--neutral); background: rgba(107, 114, 128, .12); }
+.badge.revised { color: var(--warn-text); background: rgba(212, 175, 55, .10); }
 .badge.layer { color: var(--text-dim); }
-.badge.alert { color: var(--danger-text); background: rgba(248, 113, 113, .12); }
+.badge.alert { color: var(--danger-text); background: rgba(224, 36, 36, .12); }
 
 /* ---------- 项目卡片 ---------- */
 .proj-card {
   display: block;
   width: 100%;
   text-align: left;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 38%);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
   padding: 14px;
   margin-bottom: 10px;
   cursor: pointer;
   box-shadow: var(--lift);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
 }
 
 .proj-card:active { background-color: var(--card-2); }
@@ -368,11 +366,11 @@ select { appearance: none; background-image: none; }
 }
 .proj-card .gear-wait {
   color: var(--warn-text);
-  background: rgba(167, 139, 250, .10);
+  background: rgba(212, 175, 55, .10);
 }
 .proj-card .gear-ok {
   color: var(--ok-text);
-  background: rgba(52, 211, 153, .12);
+  background: rgba(5, 150, 105, .12);
 }
 .proj-card .meta { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
 
@@ -384,7 +382,7 @@ select { appearance: none; background-image: none; }
   margin-top: 10px;
 }
 
-.progress > i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan-deep), var(--cyan-hi)); }
+.progress > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-deep), var(--gold-hi)); }
 
 /* ---------- Tab 栏 ---------- */
 .tabbar {
@@ -394,11 +392,9 @@ select { appearance: none; background-image: none; }
   display: flex;
   gap: 2px;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(180deg, rgba(15, 18, 27, .68), rgba(8, 10, 16, .74));
-  border-top: 1px solid rgba(255, 255, 255, .07);
-  box-shadow: 0 -10px 30px rgba(0, 0, 0, .45);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  background: linear-gradient(180deg, rgba(16, 17, 22, .97), rgba(11, 12, 15, .97));
+  border-top: 1px solid #232830;
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, .45);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -436,18 +432,26 @@ select { appearance: none; background-image: none; }
   gap: 5px;
 }
 
-/* 选中的页签：白字 + 青色图标，图标自带一点光晕，不画硬线框 */
+/* 选中的页签：顶部指示条 + 描边 + 亮字加粗 + 图标放大，反馈要一眼看见 */
 .tab.on {
   background: transparent;
   color: var(--text);
   font-weight: 600;
   box-shadow: none;
 }
-.tab.on svg {
-  color: var(--cyan);
-  filter: drop-shadow(0 0 8px rgba(127, 227, 242, .45));
+.tab.on svg { color: var(--gold); }
+/* 选中态只留一根极细的香槟金指示线，不画发光框 */
+.tab.on::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--gold);
 }
-/* 选中态靠颜色和光晕区分，不画硬线框 */
 .tab.on svg { width: 19px; height: 19px; }
 .tab svg { width: 17px; height: 17px; }
 
@@ -469,7 +473,7 @@ select { appearance: none; background-image: none; }
   width: 10px; height: 10px;
   border-radius: 50%;
   background: var(--card);
-  border: 2px solid rgba(255, 255, 255, .16);
+  border: 2px solid #4a505c;
 }
 
 .tl-item.merged::before { border-color: var(--muted); }
@@ -477,16 +481,14 @@ select { appearance: none; background-image: none; }
 .tl-time { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .tl-body {
   background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, 0) 40%);
-  border: 1px solid rgba(255, 255, 255, .05);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
   border-radius: 12px;
   padding: 10px 12px;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 /* 复选框：视觉 24px，用外层 .sel-wrap 把可点区域撑到 44px */
-.sel-box { width: 24px; height: 24px; accent-color: var(--cyan); cursor: pointer; }
+.sel-box { width: 24px; height: 24px; accent-color: var(--gold); cursor: pointer; }
 .sel-wrap {
   display: inline-flex;
   align-items: center;
@@ -499,14 +501,12 @@ select { appearance: none; background-image: none; }
 
 /* ---------- 列表项 ---------- */
 .item {
-  border: 1px solid rgba(255, 255, 255, .05);
+  border: 0;
   border-radius: 12px;
   background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, 0) 40%);
+  background-image: linear-gradient(158deg, rgba(255, 255, 255, .025), rgba(255, 255, 255, 0) 50%);
   padding: 11px 12px;
   margin-bottom: 10px;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .item .item-t { font-weight: 600; }
@@ -523,8 +523,8 @@ select { appearance: none; background-image: none; }
 
 /* ---------- 高亮（重复原因 / 未生效改进） ---------- */
 .highlight {
-  border-color: rgba(248, 113, 113, .38) !important;
-  background: linear-gradient(0deg, rgba(248, 113, 113, .07), rgba(248, 113, 113, .07)), var(--card-2);
+  border-color: rgba(207,125,125,.45) !important;
+  background: linear-gradient(0deg, rgba(207,125,125,.07), rgba(207,125,125,.07)), var(--card-2);
   box-shadow: none;
 }
 
@@ -541,7 +541,7 @@ select { appearance: none; background-image: none; }
 /* ---------- 表格 ---------- */
 table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.tbl th, table.tbl td { border: 1px solid var(--line); padding: 7px 8px; text-align: left; vertical-align: top; }
-table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-soft); }
+table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-soft); }
 
 .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
@@ -565,11 +565,11 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   max-height: 92vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background-color: rgba(18, 22, 32, .92);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 30%);
-  border: 1px solid rgba(255, 255, 255, .07);
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -14px 50px rgba(0, 0, 0, .60);
+  background-color: var(--card);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, 0) 30%);
+  border: 0;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -12px 44px rgba(0, 0, 0, .55);
   padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
 }
 
@@ -599,7 +599,7 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   border-radius: 999px;
   background: var(--line);
 }
-.steps .st.on { background: var(--cyan); }
+.steps .st.on { background: var(--gold); }
 .steps .st.done { background: rgba(201,168,106,.45); }
 
 /* ---------- 事实下面：原因 / 改进 ---------- */
@@ -632,18 +632,16 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 
 /* 长按目标卡片时的按压反馈 */
 .proj-card.pressing {
-  background: rgba(248, 113, 113, .06);
+  background: rgba(224, 36, 36, .06);
 }
 
 /* ---------- 战报回放 ---------- */
 .card.dark {
   background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, 0) 38%);
-  border: 1px solid rgba(255, 255, 255, .06);
-  border-radius: 18px;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
+  border-radius: 16px;
   box-shadow: var(--lift);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
 }
 .mdl-h {
   font-weight: 600;
@@ -664,7 +662,7 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   grid-template-columns: 74px minmax(0, 1fr);
   gap: 10px;
   padding: 9px 0;
-  border-top: 1px solid rgba(255, 255, 255, .07);
+  border-top: 1px solid #232830;
 }
 .cmp-k { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .cmp-v { min-width: 0; }
@@ -674,7 +672,7 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 .cmp-line.muted { color: var(--muted); }
 .cmp-line.metric .bad { color: var(--danger-text); }
 .cmp-line.metric .good { color: var(--ok-text); }
-.exp-st { color: var(--cyan-hi); }
+.exp-st { color: var(--gold-hi); }
 .cmp-line.metric .sep { color: var(--muted); margin: 0 6px; }
 .exp-ln {
   display: grid;
@@ -707,7 +705,7 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   font-weight: 500;
   color: var(--text);
 }
-.bar-back:hover, .bar-link:hover { color: var(--cyan); }
+.bar-back:hover, .bar-link:hover { color: var(--accent); }
 
 /* ---------- 复盘页：四块 ---------- */
 .blk-h {
@@ -747,34 +745,32 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   -webkit-overflow-scrolling: touch;
   padding: 8px 0;
   margin: -4px 0 12px;
-  background: linear-gradient(180deg, rgba(10, 12, 18, .95), rgba(10, 12, 18, .88));
+  background: linear-gradient(180deg, rgba(13, 14, 18, .95), rgba(13, 14, 18, .88));
   backdrop-filter: blur(10px);
 }
 .bstrip .chip {
   flex: 0 0 auto;
   min-height: 44px;
   padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .06);
   border-radius: 999px;
-  background-color: rgba(255, 255, 255, .05);
+  background-color: var(--card);
   color: var(--text-dim);
   font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
-.bstrip .chip.done { color: var(--ok-text); border-color: rgba(52, 211, 153, .30); }
+.bstrip .chip.done { color: var(--ok-text); border-color: rgba(5, 150, 105, .30); }
 /* 选中的步骤：金色药丸 */
 .bstrip .chip.on {
-  /* 选中：玻璃底不变，文字变亮，外围一圈青色柔光 */
+  /* 选中：保留深灰底，文字和图标变亮，外围一圈极细的香槟金光晕 */
   color: var(--text);
-  background-color: rgba(255, 255, 255, .07);
-  border-color: rgba(127, 227, 242, .30);
+  background-color: var(--card);
+  border-color: var(--gold-line);
   font-weight: 600;
-  box-shadow: 0 0 18px rgba(70, 170, 255, .16), inset 0 1px 0 rgba(255, 255, 255, .10);
+  box-shadow: 0 0 0 1px rgba(197, 168, 128, .18), 0 0 14px rgba(197, 168, 128, .10);
 }
-.bstrip .chip.on svg { color: var(--cyan); }
+.bstrip .chip.on svg { color: var(--gold); }
 
 /* 折叠的模块 */
 .card.sec { scroll-margin-top: calc(var(--appbar-h, 53px) + 52px); }
@@ -798,9 +794,9 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   margin-bottom: 12px;
   padding: 10px 12px;
   border: 0;
-  border-left: 2px solid rgba(248, 113, 113, .55);
+  border-left: 2px solid rgba(224, 36, 36, .55);
   border-radius: 12px;
-  background-color: rgba(248, 113, 113, .05);
+  background-color: rgba(224, 36, 36, .05);
 }
 .gap-sum .gs-t { font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
 .gap-sum .gs-s { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -811,13 +807,11 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 .chat-card {
   position: relative;
   background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, 0) 38%);
-  border: 1px solid rgba(255, 255, 255, .06);
-  border-radius: 16px;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
+  border-radius: 14px;
   padding: 12px 14px;
   box-shadow: var(--lift);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
 }
 .chat-fact { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; padding-right: 26px; }
 /* 危险操作：极小的垃圾桶图标，暗灰，点上去才变红 */
@@ -839,9 +833,9 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   margin-top: 10px;
   padding: 12px 12px;
   min-height: 44px;
-  border-left: 2px solid rgba(127, 227, 242, .22);
-  border-radius: 0 12px 12px 0;
-  background: rgba(255, 255, 255, .025);
+  border-left: 2px solid rgba(255, 255, 255, .10);
+  border-radius: 0 10px 10px 0;
+  background: rgba(255, 255, 255, .022);
   font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -849,8 +843,8 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 }
 .reply .ghost { color: var(--muted); }
 .reply b { color: var(--text-dim); font-weight: 600; }
-.reply b.k-gear { color: var(--cyan); }
-.reply.edit { cursor: default; border-left-color: rgba(127, 227, 242, .5); }
+.reply b.k-gear { color: var(--gold); }
+.reply.edit { cursor: default; border-left-color: rgba(197, 168, 128, .5); }
 .reply.edit input[type="text"] { margin-bottom: 0; }
 /* 状态标签：待验证像「未鉴定的装备」——琥珀虚线框；已闭环像已装备——青蓝发光 */
 /* 状态标签：小巧的胶囊。外面套一个 44px 的点击区，保证手按得中 */
@@ -879,16 +873,16 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 /* 待验证：暗黄底 + 金色字 */
 .st-chip.pending {
   color: var(--warn-text);
-  background: rgba(167, 139, 250, .10);
+  background: rgba(212, 175, 55, .10);
 }
 /* 已闭环：暗绿底 + 绿色字 */
 .st-chip.verified {
   color: var(--ok-text);
-  background: rgba(52, 211, 153, .12);
+  background: rgba(5, 150, 105, .12);
 }
 .st-chip.failed {
   color: var(--danger-text);
-  background: rgba(248, 113, 113, .12);
+  background: rgba(224, 36, 36, .12);
 }
 .st-hit:hover .st-chip { background: rgba(255, 255, 255, .07); }
 
@@ -919,18 +913,18 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 }
 .mood-bad.on {
   color: var(--danger-text);
-  border-color: rgba(248, 113, 113, .55);
-  background: rgba(248, 113, 113, .12);
+  border-color: rgba(224, 36, 36, .55);
+  background: rgba(224, 36, 36, .12);
 }
 .mood-good.on {
   color: var(--ok-text);
-  border-color: rgba(52, 211, 153, .55);
-  background: rgba(52, 211, 153, .12);
+  border-color: rgba(5, 150, 105, .55);
+  background: rgba(5, 150, 105, .12);
 }
 .mood-flat.on {
   color: var(--warn-text);
-  border-color: rgba(167, 139, 250, .55);
-  background: rgba(167, 139, 250, .12);
+  border-color: rgba(212, 175, 55, .55);
+  background: rgba(212, 175, 55, .12);
 }
 
 /* 顶栏标题居中（战报回放）：标题跨整条栏居中，左右按钮各站一边 */
@@ -951,13 +945,11 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 }
 .stat-box {
   background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 38%);
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
+  border-radius: 12px;
   padding: 10px 12px;
   box-shadow: var(--lift);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
 }
 .stat-box .n { font-size: 22px; font-weight: 700; line-height: 1.2; }
 .stat-box .l { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
@@ -974,7 +966,7 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
   cursor: pointer;
   font-size: 14px;
 }
-.opt.on { border-color: rgba(127, 227, 242, .40); background: var(--cyan-soft); color: var(--text); font-weight: 600; }
+.opt.on { border-color: #6d5a36; background: var(--gold-soft); color: var(--text); font-weight: 600; }
 
 /* ---------- 目标表单：验证标准行 ----------
    两栏在窄屏上很窄，删除按钮叠在输入框右侧的留白里，
@@ -992,15 +984,15 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 .alert-box {
   border: 1px solid rgba(207,174,106,.45);
   background: rgba(207,174,106,.08);
-  color: var(--warn-text);
+  color: #dfc48c;
   border-radius: 10px;
   padding: 9px 11px;
   font-size: 13px;
   margin-bottom: 12px;
 }
 
-.alert-box.err { border-color: rgba(248, 113, 113, .38); background: rgba(248, 113, 113, .09); color: var(--danger-text); }
-.alert-box.ok { border-color: rgba(52, 211, 153, .38); background: rgba(52, 211, 153, .08); color: var(--ok-text); }
+.alert-box.err { border-color: rgba(207,125,125,.5); background: rgba(207,125,125,.09); color: #e3b3b3; }
+.alert-box.ok { border-color: rgba(143,185,159,.45); background: rgba(143,185,159,.08); color: #b6d4c0; }
 
 /* ---------- Toast ---------- */
 .toast-root {
@@ -1019,21 +1011,19 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 
 .toast {
   max-width: 88vw;
-  background-color: rgba(20, 24, 34, .88);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
-  border: 1px solid rgba(255, 255, 255, .09);
+  background-color: #1a1d24;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, 0));
+  border: 0;
   color: var(--text);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 10px 14px;
   font-size: 13.5px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, .55);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .55);
   animation: toast-in .18s ease;
 }
 
-.toast.err { border-color: rgba(248, 113, 113, .38); color: var(--danger-text); }
-.toast.ok { border-color: rgba(52, 211, 153, .38); color: var(--ok-text); }
+.toast.err { border-color: rgba(207,125,125,.5); color: #e3b3b3; }
+.toast.ok { border-color: rgba(143,185,159,.45); color: #b6d4c0; }
 
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
@@ -1062,3 +1052,218 @@ table.tbl th { color: var(--cyan-hi); font-weight: 500; background: var(--bg-sof
 }
 
 hr.sep { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+
+/* =====================================================================
+   金属质感层
+   在原有暗金基线之上叠三件事：
+   1) 金属倒角高光 —— 顶边一道镜面反光 + 底边一道暗边，靠明暗差撑出轮廓，
+      不再是生硬的纯色线框；
+   2) 暗金渐变与弥散阴影 —— 受光面（上亮下暗的金属渐变）代替平涂色块，
+      底下再补一层弥散影让它浮起来；
+   3) 微光呼吸感 —— 情绪标签选中时缓慢起伏的辉光，像指示灯。
+   ===================================================================== */
+
+/* ---------- 1. 金属倒角高光 ---------- */
+/* 卡片与内嵌块：顶边镜面反光 + 底部暗边 + 弥散影 */
+.card,
+.proj-card,
+.chat-card,
+.stat-box,
+.tl-body,
+.card.dark {
+  position: relative;
+  border: 1px solid var(--bevel-soft);
+  border-top-color: var(--bevel);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, .45),
+    0 12px 28px -14px rgba(0, 0, 0, .6),
+    0 1px 0 rgba(255, 255, 255, .05) inset,
+    0 -1px 0 rgba(0, 0, 0, .35) inset;
+}
+
+/* 内嵌块（列表项、回复、录入框）：也给一道顶边倒角，层级才连贯 */
+.item,
+.newfact {
+  border: 1px solid var(--bevel-soft);
+  border-top-color: var(--bevel);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, .35),
+    0 1px 0 rgba(255, 255, 255, .04) inset,
+    0 -1px 0 rgba(0, 0, 0, .28) inset;
+}
+/* 回复块左边是一条语义色竖条，别把竖条冲掉，只补内阴影 */
+.reply {
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+/* 录入框是虚线的，保留虚线但换成更亮一点的墨线 */
+.newfact {
+  border-style: dashed;
+  border-top-color: rgba(255, 255, 255, .10);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .028), rgba(255, 255, 255, 0) 40%);
+}
+
+/* 弹层：顶部一道高光，底部沉下去 */
+.modal {
+  border: 1px solid var(--bevel-soft);
+  border-top-color: var(--bevel);
+  box-shadow: 0 -12px 44px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+/* 卡片内部顶光晕：上半张一层极淡的白色渐落，像被环境光照到。
+   直接叠进 background-image（不覆盖文字），多一层金属受光。 */
+.card,
+.proj-card,
+.chat-card,
+.stat-box,
+.card.dark,
+.tl-body {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 34%);
+}
+
+/* 输入框：内凹的暗底 + 一道顶边内阴影（像刻进金属板），聚焦时泛起金光 */
+input[type=text], input[type=date], input[type=number], input[type=datetime-local], select, textarea {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(229, 192, 123, .55);
+  box-shadow:
+    0 0 0 3px rgba(229, 192, 123, .10),
+    0 0 12px rgba(229, 192, 123, .12),
+    inset 0 1px 2px rgba(0, 0, 0, .45);
+}
+
+/* ---------- 2. 暗金渐变与弥散阴影 ---------- */
+/* 主按钮：一块有厚度的暗色金属 —— 上亮下暗的受光面 + 细金边 + 内部文字辉光 */
+.btn.primary {
+  background-image: var(--metal-face);
+  background-color: transparent;
+  border-color: var(--metal-edge);
+  color: var(--metal-text);
+  text-shadow: 0 0 10px rgba(229, 192, 123, .35);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, .45),
+    0 0 16px rgba(229, 192, 123, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .10);
+}
+.btn.primary:hover {
+  background-image: linear-gradient(180deg, rgba(229, 192, 123, .24), rgba(176, 128, 68, .10) 55%, rgba(229, 192, 123, .06));
+  border-color: rgba(229, 192, 123, .72);
+}
+.btn.primary:active {
+  transform: scale(.985);
+  background-image: linear-gradient(180deg, rgba(229, 192, 123, .30), rgba(176, 128, 68, .14) 55%, rgba(229, 192, 123, .08));
+}
+/* 按下缩放：让按钮像真有厚度 */
+.btn:active { transform: scale(.985); }
+.btn.gold:active, .btn.ghost:active { transform: none; }
+
+/* 次按钮（纯文字）悬停时也亮一下 */
+.btn.gold:hover { color: var(--metal-text); text-shadow: 0 0 10px rgba(229, 192, 123, .3); }
+
+/* 状态胶囊：暗金渐变底代替平涂 */
+.badge.doing, .badge.running,
+.gear-wait, .st-chip.pending {
+  background-image: linear-gradient(180deg, rgba(212, 175, 55, .18), rgba(212, 175, 55, .06));
+  border: 1px solid rgba(212, 175, 55, .30);
+  box-shadow: 0 0 12px rgba(212, 175, 55, .10), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+.badge.verified, .gear-ok, .st-chip.verified {
+  background-image: linear-gradient(180deg, rgba(5, 150, 105, .22), rgba(5, 150, 105, .07));
+  border: 1px solid rgba(5, 150, 105, .32);
+  box-shadow: 0 0 12px rgba(5, 150, 105, .12), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.badge.disputed, .badge.failed, .st-chip.failed {
+  background-image: linear-gradient(180deg, rgba(224, 36, 36, .20), rgba(224, 36, 36, .06));
+  border: 1px solid rgba(224, 36, 36, .32);
+  box-shadow: 0 0 12px rgba(224, 36, 36, .12), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+/* 步骤胶囊选中：暗金受光面 + 外围柔光 */
+.bstrip .chip.on {
+  background-image: var(--metal-face);
+  border-color: var(--metal-edge);
+  box-shadow:
+    0 0 0 1px rgba(229, 192, 123, .18),
+    0 0 16px rgba(229, 192, 123, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .10);
+}
+.bstrip .chip.done {
+  background-image: linear-gradient(180deg, rgba(5, 150, 105, .20), rgba(5, 150, 105, .06));
+  border-color: rgba(5, 150, 105, .30);
+}
+
+/* 选项按钮 / 提示块 */
+.opt.on {
+  background-image: var(--metal-face);
+  border-color: var(--metal-edge);
+  box-shadow: 0 0 14px rgba(229, 192, 123, .12), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.alert-box {
+  background-image: linear-gradient(180deg, rgba(207, 174, 106, .12), rgba(207, 174, 106, .05));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+/* 进度条：受光面的金属条 */
+.progress > i {
+  background-image: linear-gradient(180deg, rgba(229, 192, 123, .85), var(--gold-deep));
+  box-shadow: 0 0 10px rgba(229, 192, 123, .35);
+}
+
+/* 底栏选中：指示线带光晕，图标有金属辉光 */
+.tab.on::before {
+  background: linear-gradient(180deg, var(--metal-text), var(--gold-deep));
+  box-shadow: 0 2px 10px rgba(229, 192, 123, .75);
+}
+.tab.on svg { color: var(--metal-text); filter: drop-shadow(0 0 6px rgba(229, 192, 123, .45)); }
+
+/* 顶栏/底栏的金属发丝线 */
+.appbar { border-bottom: 1px solid rgba(255, 255, 255, .05); box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 8px 20px rgba(0, 0, 0, .45); }
+.tabbar { border-top: 1px solid rgba(255, 255, 255, .06); }
+
+/* ---------- 3. 微光呼吸感 ---------- */
+/* 情绪胶囊选中：辉光缓缓起伏，像一颗指示灯在呼吸 */
+.mood {
+  position: relative;
+  transition: color .3s, border-color .3s, box-shadow .3s, background-color .3s;
+}
+.mood.on {
+  animation: mood-breathe 2.8s ease-in-out infinite;
+}
+.mood-bad.on {
+  box-shadow: 0 0 0 1px rgba(224, 36, 36, .20), 0 0 16px rgba(224, 36, 36, .18), inset 0 0 16px rgba(224, 36, 36, .10);
+}
+.mood-good.on {
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, .20), 0 0 16px rgba(5, 150, 105, .18), inset 0 0 16px rgba(5, 150, 105, .10);
+}
+.mood-flat.on {
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .20), 0 0 16px rgba(212, 175, 55, .18), inset 0 0 16px rgba(212, 175, 55, .10);
+}
+@keyframes mood-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
+/* 情绪点本身带一点发光 */
+.mood-bad.on {
+  background-image: linear-gradient(180deg, rgba(224, 36, 36, .22), rgba(224, 36, 36, .07));
+}
+.mood-good.on {
+  background-image: linear-gradient(180deg, rgba(5, 150, 105, .22), rgba(5, 150, 105, .07));
+}
+.mood-flat.on {
+  background-image: linear-gradient(180deg, rgba(212, 175, 55, .22), rgba(212, 175, 55, .07));
+}
+
+/* 徽章（已闭环 / 待验证）也给一点呼吸感，幅度更小 */
+.gear-ok, .gear-wait { animation: mood-breathe 3.4s ease-in-out infinite; }
+
+/* 降低动效偏好：关掉呼吸动画 */
+@media (prefers-reduced-motion: reduce) {
+  .mood.on, .gear-ok, .gear-wait { animation: none; }
+  .btn:active, .btn.primary:active { transform: none; }
+}

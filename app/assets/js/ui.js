@@ -251,7 +251,7 @@
     if (!bar) return;
 
     var logo =
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#7fe3f2" stroke-width="1.7" stroke-linecap="round">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#c5a880" stroke-width="1.7" stroke-linecap="round">' +
       '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>';
 
     var title = 'Reflect';
@@ -442,7 +442,7 @@
         '</div>';
     }
     h += '</div>' +
-      '<button class="btn sm soft" data-act="add-crit">+ 再加一条</button>' +
+      '<button class="btn sm gold" data-act="add-crit">+ 再加一条</button>' +
       '</div>' +
       '<div class="row end" style="margin-top:12px">' +
       (isNew ? '' : '<button class="btn ghost" data-act="cancel-edit">取消</button>') +
@@ -462,7 +462,7 @@
       '<textarea id="r-gap" data-act="r-gap" placeholder="例：完成率差 20 个百分点">' +
       esc(resultDraft.gap) + '</textarea></label>' +
       '<div id="r-metrics"></div>' +
-      '<button class="btn sm soft" data-act="add-metric" style="margin-bottom:10px">＋ 添加关键指标</button>' +
+      '<button class="btn sm gold" data-act="add-metric" style="margin-bottom:10px">＋ 添加关键指标</button>' +
       '<button class="btn primary block" data-act="add-result">提交结果</button>';
 
     if (!goal.results.length) {
