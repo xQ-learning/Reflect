@@ -144,23 +144,31 @@ def run(d):
     fresh = d.execute("""
       var v = document.getElementById('view');
       var heads = [];
-      var hs = v.querySelectorAll('.blk-h h2');
+      var hs = v.querySelectorAll('.blk-h h2, .sec-t');
       for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
-      return {hash: location.hash, heads: heads,
+      var chips = [];
+      var cs = v.querySelectorAll('.bstrip .chip');
+      for (var j=0;j<cs.length;j++) chips.push(cs[j].textContent.trim());
+      return {hash: location.hash, heads: heads, chips: chips,
               hasDesc: !!document.getElementById('g-desc'),
               hasResult: !!document.getElementById('r-actual'),
               hasFact: !!document.getElementById('f-content'),
-              hasCause: !!v.querySelector('.cause-in'),
-              hasAction: !!v.querySelector('.action-in'),
+              hasTime: !!document.getElementById('f-time'),
+              moods: v.querySelectorAll('.mood').length,
               hasSubmit: !!v.querySelector('[data-act=submit-review]'),
-              tip: (window.__block('原因与改进') || {}).textContent || ''};
+              tip: v.textContent};
     """)
     check("点复盘页签进入新的复盘", fresh["hash"] == "#/review/new", fresh["hash"])
-    check("新复盘直接就是纵向四块",
-          fresh["heads"] == ["目标", "结果", "事实", "原因与改进"], str(fresh["heads"]))
-    check("四块的内容区都在", fresh["hasDesc"] and fresh["hasResult"] and fresh["hasFact"], str(fresh))
-    check("还没事实时原因与改进块给出提示而不是空白",
-          "还没有事实" in fresh.get("tip", ""), str(fresh.get("tip", "")))
+    check("新复盘直接就是三个模块",
+          fresh["heads"] == ["🎯 目标", "📊 结果", "📝 事实与归因"], str(fresh["heads"]))
+    check("顶部悬浮步骤条有四步",
+          len(fresh["chips"]) == 4 and "🎯" in fresh["chips"][0]
+          and "归因与装备" in fresh["chips"][3], str(fresh["chips"]))
+    check("三块的内容区都在", fresh["hasDesc"] and fresh["hasResult"] and fresh["hasFact"], str(fresh))
+    check("事实时间自动，不再要手填时间", not fresh["hasTime"], str(fresh))
+    check("写事实时可以选情绪", fresh["moods"] == 3, str(fresh["moods"]))
+    check("还没事实时给出提示而不是空白",
+          "还没有事实" in fresh.get("tip", ""), str(fresh.get("tip", ""))[:120])
     check("目标没建好时不显示提交按钮", not fresh["hasSubmit"], str(fresh["hasSubmit"]))
     top_seed = d.execute("""
       var bar = document.getElementById('appbar');
@@ -189,7 +197,7 @@ def run(d):
               expLines: v.querySelectorAll('.exp-ln').length,
               hasGood: v.textContent.indexOf('🟢') >= 0,
               hasBad: v.textContent.indexOf('🔴') >= 0,
-              hasSlot: v.textContent.indexOf('还没有装备') >= 0,
+              hasSlot: v.textContent.indexOf('暂无经验沉淀') >= 0,
               viewActs: v.querySelectorAll('[data-act]').length,
               hasExpect: v.textContent.indexOf('💡 预期') >= 0,
               hasReal: v.textContent.indexOf('⚠️ 现实') >= 0,
@@ -204,16 +212,17 @@ def run(d):
               barEdit: !!bar.querySelector('[data-act=edit-review]'),
               barExport: !!bar.querySelector('[data-act=open-export]'),
               barBack: !!bar.querySelector('[data-act=back]'),
+              barRight: bar.lastElementChild ? bar.lastElementChild.textContent.trim() : '',
               tabHidden: getComputedStyle(document.getElementById('tabbar')).display === 'none',
               bodyPad: parseFloat(getComputedStyle(document.body).paddingBottom) || 0,
               text: v.textContent};
     """)
     check("点目标页卡片进入战报回放页", opened["hash"].startswith("#/view/"), opened["hash"])
-    check("只有两个模块：预期 vs 现实 / 经验流",
-          opened["mods"] == ["📦 预期 vs 现实", "📦 经验流"], str(opened["mods"]))
-    check("顶栏是 < / 战报回放 / 编辑",
-          opened["barLeft"] == "<" and "战报回放" in opened["barTitle"]
-          and opened["barEdit"], str(opened))
+    check("只有两个模块：预期 vs 现实 / 经验时间线",
+          opened["mods"] == ["📊 预期 vs 现实", "🕰️ 经验时间线"], str(opened["mods"]))
+    check("顶栏是 < 返回 / 战报回放 / 编辑 >",
+          opened["barLeft"] == "< 返回" and "战报回放" in opened["barTitle"]
+          and opened["barEdit"] and opened["barRight"] == "编辑 >", str(opened))
     check("战报回放顶栏没有下载按钮", not opened["barExport"], str(opened))
     check("模块一含 预期/现实/差距",
           opened["hasExpect"] and opened["hasReal"] and opened["hasGap"], str(opened))
@@ -240,20 +249,46 @@ def run(d):
     editing = d.execute("""
       var v = document.getElementById('view');
       var heads = [];
-      var hs = v.querySelectorAll('.blk-h h2');
+      var hs = v.querySelectorAll('.blk-h h2, .sec-t');
       for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
-      return {hash: location.hash, heads: heads,
-              hasResult: !!document.getElementById('r-actual'),
+      var chips = [];
+      var cs = v.querySelectorAll('.bstrip .chip');
+      for (var j=0;j<cs.length;j++) chips.push(cs[j].textContent.trim());
+      return {hash: location.hash, heads: heads, chips: chips,
+              goalCollapsed: !!v.querySelector('#sec-goal .sec-sum'),
+              goalForm: !!document.getElementById('g-desc'),
+              resultSummary: !!v.querySelector('#sec-result .sec-sum'),
               hasFact: !!document.getElementById('f-content'),
-              hasSubmit: !!v.querySelector('[data-act=submit-review]'),
-              steps: v.querySelectorAll('.bstrip .badge').length};
+              cards: v.querySelectorAll('.chat-card').length,
+              replies: v.querySelectorAll('.reply').length,
+              hasSubmit: !!v.querySelector('[data-act=submit-review]')};
     """)
     check("点「编辑」进入复盘页", editing["hash"].startswith("#/review/"), editing["hash"])
-    check("复盘页纵向四块：目标/结果/事实/原因与改进",
-          editing["heads"] == ["目标", "结果", "事实", "原因与改进"], str(editing["heads"]))
-    check("复盘页四块的内容区都在", editing["hasResult"] and editing["hasFact"], str(editing))
-    check("有四步进度条", editing["steps"] == 4, str(editing["steps"]))
+    check("复盘页三个模块：目标/结果/事实与归因",
+          editing["heads"] == ["🎯 目标", "📊 结果", "📝 事实与归因"], str(editing["heads"]))
+    check("填好的模块自动折叠成摘要",
+          editing["goalCollapsed"] and editing["resultSummary"] and not editing["goalForm"],
+          str(editing))
+    check("事实与归因是聊天式时间线",
+          editing["cards"] > 0 and editing["replies"] >= editing["cards"] * 2, str(editing))
+    check("顶部悬浮步骤条有四步", len(editing["chips"]) == 4, str(editing["chips"]))
+    check("能写新事实", editing["hasFact"], str(editing))
     check("已有目标可以提交复盘", editing["hasSubmit"], str(editing["hasSubmit"]))
+
+    # 点折叠的目标卡片 → 展开编辑
+    d.execute("""
+      var el = document.querySelector('#sec-goal .sec-sum');
+      if (el) el.click();
+      return true;
+    """)
+    time.sleep(0.5)
+    expanded = d.execute("""
+      var v = document.getElementById('view');
+      return {form: !!document.getElementById('g-desc'),
+              collapsed: !!v.querySelector('#sec-goal .sec-sum')};
+    """)
+    check("点折叠卡片能展开编辑目标",
+          expanded["form"] and not expanded["collapsed"], str(expanded))
 
     # ---------- B. 目标块：两栏，填好即可创建 ----------
     print("\n[B] 目标块：两栏，填好即可创建")
@@ -336,7 +371,7 @@ def run(d):
     blocks = d.execute("""
       var v = document.getElementById('view');
       var heads = [];
-      var hs = v.querySelectorAll('.blk-h h2');
+      var hs = v.querySelectorAll('.blk-h h2, .sec-t');
       for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
       return {heads: heads,
               result: !!document.getElementById('r-actual'),
@@ -344,16 +379,16 @@ def run(d):
               cause: !!v.querySelector('.cause-in'),
               action: !!v.querySelector('.action-in'),
               submit: !!v.querySelector('[data-act=submit-review]'),
-              edit: !!v.querySelector('[data-act=edit-goal]'),
+              edit: !!v.querySelector('#sec-goal .sec-sum'),
               form: !!document.getElementById('g-desc')};
     """)
-    check("创建后仍是纵向四块", blocks["heads"] == ["目标", "结果", "事实", "原因与改进"],
-          str(blocks["heads"]))
-    check("创建后目标块变只读并可修改", blocks["edit"] and not blocks["form"], str(blocks))
+    check("创建后仍是三个模块",
+          blocks["heads"] == ["🎯 目标", "📊 结果", "📝 事实与归因"], str(blocks["heads"]))
+    check("创建后目标块折叠成摘要，点开可改", blocks["edit"] and not blocks["form"], str(blocks))
     check("创建后可以提交复盘", blocks["submit"], str(blocks["submit"]))
 
     # 修改即覆盖
-    d.execute("document.querySelector('[data-act=edit-goal]').click(); return true;")
+    d.execute("document.querySelector('#sec-goal .sec-sum').click(); return true;")
     time.sleep(0.5)
     edited = d.execute("""
       var d = document.getElementById('g-desc');
@@ -403,12 +438,26 @@ def run(d):
           auto_state["results"] == 1 and auto_state["actual"] == "直接记下的实际结果", str(auto_state))
 
     # ---------- C. 其余三块的形态 ----------
-    print("\n[C] 结果 / 事实 / 原因与改进")
+    print("\n[C] 结果 / 事实与归因")
     d.execute("location.hash = '#/review/demo-current-clip'; return true;")
     time.sleep(0.6)
     result = d.execute("""
       var v = document.getElementById('view');
-      var b = window.__block('结果');
+      var card = v.querySelector('#sec-result');
+      var sum = card ? card.querySelector('.sec-sum') : null;
+      return {collapsed: !!sum, text: card ? card.textContent : '',
+              hasForm: !!document.getElementById('r-actual')};
+    """)
+    check("结果块默认折叠成摘要", result["collapsed"] and not result["hasForm"], str(result))
+    check("结果摘要里有实际结果与差距",
+          "实际" in result["text"] and "差距" in result["text"], result["text"][:120])
+
+    # 展开结果块 → 表单
+    d.execute("document.querySelector('#sec-result .sec-sum').click(); return true;")
+    time.sleep(0.5)
+    result2 = d.execute("""
+      var v = document.getElementById('view');
+      var b = document.getElementById('sec-result');
       var gap = b.querySelector('#r-gap');
       var met = b.querySelector('#r-metrics');
       var btn = b.querySelector('[data-act=add-metric]');
@@ -424,96 +473,59 @@ def run(d):
               btnAfterGap: after(gap, btn),
               hasLatest: b.textContent.indexOf('最新提交') >= 0};
     """)
-    check("结果块无提交人", not result["hasAuthor"] and "提交人" not in result["text"], str(result))
+    check("结果块无提交人", not result2["hasAuthor"] and "提交人" not in result2["text"], str(result2))
     check("结果块保留实际结果与目标差距",
-          result["hasActual"] and result["hasGap"], str(result))
-    check("关键指标下移到目标差距下面",
-          result["metricsAfterGap"] == 1 and result["btnAfterGap"] == 1, str(result))
-    check("结果块不再显示「最新提交」", not result["hasLatest"], str(result))
+          result2["hasActual"] and result2["hasGap"], str(result2))
+    check("关键指标在目标差距下面",
+          result2["metricsAfterGap"] == 1 and result2["btnAfterGap"] == 1, str(result2))
+    check("结果块不再显示「最新提交」", not result2["hasLatest"], str(result2))
 
-    facts = d.execute("""
-      var b = window.__block('事实');
-      return {cols: b.querySelectorAll('.cols').length,
-              hasTimeline: !!b.querySelector('.timeline'),
-              hasContent: !!b.querySelector('#f-content'),
-              hasTime: !!b.querySelector('#f-time'),
-              text: b.textContent};
-    """)
-    check("事实块没有两栏布局", facts["cols"] == 0, str(facts["cols"]))
-    check("事实块只留表单，不再带时间线", not facts["hasTimeline"], str(facts["hasTimeline"]))
-    check("事实块保留内容与时间点输入", facts["hasContent"] and facts["hasTime"], str(facts))
-    check("事实块不出现「关键事实」", "关键事实" not in facts["text"], "")
-    check("事实块不出现「关键」", "关键" not in facts["text"], "")
-    for word in ["类型", "置信度", "证据", "来源", "待验证"]:
-        check("事实块不出现「%s」" % word, word not in facts["text"], "")
-
-    causes = d.execute("""
-      var b = window.__block('原因与改进');
-      var items = b.querySelectorAll('.tl-item');
-      var first = items.length ? items[0] : null;
-      return {hasLayer: !!b.querySelector('#c-layer'),
-              hasTimeline: !!b.querySelector('.timeline'),
-              items: items.length,
-              lines: b.querySelectorAll('.fact-ln').length,
-              causeInputs: b.querySelectorAll('.cause-in').length,
-              actionInputs: b.querySelectorAll('.action-in').length,
-              readOnly: b.querySelectorAll('.fl-ro').length,
-              editBtns: b.querySelectorAll('[data-act=edit-cause],[data-act=edit-action]').length,
+    chat = d.execute("""
+      var v = document.getElementById('view');
+      var b = document.getElementById('sec-facts');
+      var cards = b.querySelectorAll('.chat-card');
+      var first = cards.length ? cards[0] : null;
+      return {cards: cards.length,
+              replies: b.querySelectorAll('.reply').length,
+              hasMood: b.querySelectorAll('.chat-fact').length,
+              delBtns: b.querySelectorAll('.chat-del').length,
+              hasStatus: b.querySelectorAll('.st-chip').length,
+              hasGhost: b.textContent.indexOf('点击这里补充原因') >= 0,
+              hasGearGhost: b.textContent.indexOf('点击这里锻造新装备') >= 0,
+              hasTime: b.querySelectorAll('.tl-time').length,
+              moods: b.querySelectorAll('.mood').length,
+              moodOn: b.querySelectorAll('.mood.on').length,
+              hasForm: !!document.getElementById('f-content'),
+              hasGapSum: !!b.querySelector('.gap-sum'),
+              gapText: b.querySelector('.gap-sum') ? b.querySelector('.gap-sum').textContent : '',
+              hasLayer: !!b.querySelector('#c-layer'),
               hasStandaloneCause: !!b.querySelector('#c-text'),
               hasFactPicker: !!b.querySelector('#c-facts'),
               hasStandaloneAction: !!b.querySelector('#a-title'),
               hasOwner: !!b.querySelector('#a-owner'), hasDue: !!b.querySelector('#a-due'),
               hasMetric: !!b.querySelector('#a-metric'),
-              firstCauseValue: first ? (first.querySelector('.cause-in') || {}).value : '',
-              firstActionValue: first ? (first.querySelector('.action-in') || {}).value : '',
-              firstCauseRO: first ? (first.querySelector('.fl-ro') || {}).textContent || '' : '',
+              firstText: first ? first.textContent : '',
               text: b.textContent};
     """)
-    check("归因没有层级选择", not causes["hasLayer"], str(causes))
-    for word in ["目标翻译", "执行（", "资源（", "外部（", "层级"]:
-        check("归因不出现「%s」" % word, word not in causes["text"], "")
-    check("时间线搬进了原因与改进块", causes["hasTimeline"], str(causes))
-    check("每条事实下面都有原因与改进两行",
-          causes["items"] > 0 and causes["lines"] == causes["items"] * 2, str(causes))
-    check("存过的原因/改进变成只读，并带「修改」入口",
-          causes["readOnly"] > 0 and causes["editBtns"] == causes["readOnly"], str(causes))
-    check("没写的仍留空输入框",
-          causes["causeInputs"] + causes["actionInputs"] > 0, str(causes))
-    check("时间线有文字说明", "时间线" in causes["text"], causes["text"][:80])
-    check("原因与改进块有引导说明",
-          "写它的原因" in causes["text"] or "原因和改进" in causes["text"], causes["text"][:120])
-    check("不再显示改进状态", "改进状态" not in causes["text"], causes["text"][:200])
-
-    gap_sum = d.execute("""
-      var b = window.__block('原因与改进');
-      var tl = b.querySelector('.timeline');
-      var item = b.querySelector('.item');
-      var hint = b.querySelector('.hint');
-      function before(a, c) {
-        if (!a || !c) return 0;
-        return (a.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) ? 1 : 0;
-      }
-      return {hasLabel: b.textContent.indexOf('差距汇总') >= 0,
-              hasLatest: b.textContent.indexOf('最新提交') >= 0,
-              hasGapText: b.textContent.indexOf('完成率差 20 个百分点') >= 0,
-              beforeTimeline: before(item, tl),
-              hint: hint ? hint.textContent : '',
-              sentences: hint ? (hint.textContent.match(/。/g) || []).length : 0};
-    """)
-    check("原因与改进块顶上出现差距汇总",
-          gap_sum["hasLabel"] and gap_sum["hasLatest"] and gap_sum["hasGapText"], str(gap_sum))
-    check("差距汇总排在时间线上面", gap_sum["beforeTimeline"] == 1, str(gap_sum))
-    check("原因与改进的说明只剩一句话", gap_sum["sentences"] == 1, str(gap_sum))
-    check("没有独立的「添加原因」表单和关联事实选择器",
-          not causes["hasStandaloneCause"] and not causes["hasFactPicker"]
-          and not causes["hasStandaloneAction"], str(causes))
-    check("改进去掉负责人/截止/验证指标",
-          not causes["hasOwner"] and not causes["hasDue"] and not causes["hasMetric"], str(causes))
-    check("改进面板不出现「负责人」「截止」「验证指标」",
-          "负责人" not in causes["text"] and "截止" not in causes["text"]
-          and "验证指标" not in causes["text"], "")
-    check("已有原因/改进回填到对应事实下面",
-          causes["firstCauseValue"] != "" or causes["firstCauseRO"] != "", str(causes))
+    check("事实与归因是聊天卡片", chat["cards"] > 0, str(chat["cards"]))
+    check("每条事实带原因与装备两行回复",
+          chat["replies"] >= chat["cards"] * 2, str(chat))
+    check("每条事实右上角有垃圾桶", chat["delBtns"] == chat["cards"], str(chat))
+    check("每条事实带时间", chat["hasTime"] == chat["cards"], str(chat))
+    check("装备带状态标记", chat["hasStatus"] > 0, str(chat))
+    check("没写的原因和装备留引导占位",
+          chat["hasGhost"] and chat["hasGearGhost"], str(chat))
+    check("写新事实带情绪选择", chat["moods"] == 3 and chat["moodOn"] == 1, str(chat))
+    check("时间线上面有差距汇总",
+          chat["hasGapSum"] and "差距汇总" in chat["gapText"], chat["gapText"][:100])
+    check("没有独立的添加原因表单和关联事实选择器",
+          not chat["hasLayer"] and not chat["hasStandaloneCause"]
+          and not chat["hasFactPicker"] and not chat["hasStandaloneAction"], str(chat))
+    check("归因面板不出现「负责人」「截止」「验证指标」",
+          "负责人" not in chat["text"] and "截止" not in chat["text"]
+          and "验证指标" not in chat["text"], "")
+    for word in ["目标翻译", "执行（", "资源（", "外部（", "层级", "置信度", "证据"]:
+        check("事实与归因不出现「%s」" % word, word not in chat["text"], "")
 
     noflag = d.execute("return !!document.querySelector('[data-act=toggle-key-fact]');")
     check("没有「标为关键」入口", noflag is False, str(noflag))
@@ -523,20 +535,22 @@ def run(d):
     time.sleep(0.6)
     saved = d.execute("""
       var v = document.getElementById('view');
-      var items = v.querySelectorAll('.tl-item');
-      var target = null;
-      for (var i=0;i<items.length;i++){
-        var ci = items[i].querySelector('.cause-in');
-        if (ci && !ci.value) { target = items[i]; break; }
+      var reps = v.querySelectorAll('.reply[data-act=edit-cause]');
+      for (var i=0;i<reps.length;i++){
+        if (reps[i].textContent.indexOf('点击这里补充原因') >= 0){
+          reps[i].click();
+          return {factId: reps[i].getAttribute('data-fact')};
+        }
       }
-      if (!target) return {no: true};
-      var fi = target.querySelector('.cause-in').getAttribute('data-fact');
-      var ci = target.querySelector('.cause-in');
+      return {no: true};
+    """)
+    time.sleep(0.5)
+    saved2 = d.execute("""
+      var ci = document.querySelector('.cause-in');
+      if (!ci) return {no: true};
+      var fi = ci.getAttribute('data-fact');
       ci.value = '这条事实对应的原因';
       ci.dispatchEvent(new Event('input', {bubbles:true}));
-      var ai = target.querySelector('.action-in');
-      ai.value = '这条事实对应的改进';
-      ai.dispatchEvent(new Event('input', {bubbles:true}));
       document.querySelector('[data-act=save-cause][data-fact="' + fi + '"]').click();
       var g = window.Reflect.store.getGoal('demo-current-clip');
       var c = null;
@@ -544,56 +558,51 @@ def run(d):
       return {factId: fi, cause: c ? c.text : '', causeFactId: c ? c.factId : ''};
     """)
     time.sleep(0.7)
-    check("在事实下面能存下原因", saved.get("cause") == "这条事实对应的原因", str(saved))
-    check("原因挂到了那条事实上", saved.get("causeFactId") == saved.get("factId"), str(saved))
+    check("在事实下面能存下原因", saved2.get("cause") == "这条事实对应的原因", str(saved2))
+    check("原因挂到了那条事实上",
+          saved2.get("causeFactId") == saved2.get("factId") and saved2.get("factId"), str(saved2))
 
-    # 存完之后：只读显示 + 「修改」按钮
+    # 存完之后：只读显示 + 可点开再改
     ro = d.execute("""
       var v = document.getElementById('view');
-      var fi = arguments[0];
-      var rows = v.querySelectorAll('.fl-ro');
+      var reps = v.querySelectorAll('.reply');
       var hit = null;
-      for (var i=0;i<rows.length;i++){
-        if (rows[i].textContent.indexOf('这条事实对应的原因') >= 0) { hit = rows[i]; break; }
+      for (var i=0;i<reps.length;i++){
+        if (reps[i].textContent.indexOf('这条事实对应的原因') >= 0) { hit = reps[i]; break; }
       }
       if (!hit) return {no: true};
-      var btn = hit.querySelector('[data-act=edit-cause]');
       return {hasText: hit.textContent.indexOf('这条事实对应的原因') >= 0,
-              hasEdit: !!btn, fact: fi};
-    """, [saved.get("factId")])
+              readonly: hit.getAttribute('data-act') === 'edit-cause',
+              text: hit.textContent};
+    """)
     check("存过的原因变成只读文字", ro.get("hasText") and not ro.get("no"), str(ro))
-    check("只读的原因旁边有「修改」", ro.get("hasEdit"), str(ro))
+    check("只读的原因可点开再改", ro.get("readonly"), str(ro))
 
-    # 点「修改」回到输入框
+    # 点开回到输入框
     d.execute("""
-      var rows = document.querySelectorAll('.fl-ro');
-      for (var i=0;i<rows.length;i++){
-        if (rows[i].textContent.indexOf('这条事实对应的原因') >= 0){
-          var b = rows[i].querySelector('[data-act=edit-cause]');
-          if (b) { b.click(); return true; }
-        }
+      var reps = document.querySelectorAll('.reply[data-act=edit-cause]');
+      for (var i=0;i<reps.length;i++){
+        if (reps[i].textContent.indexOf('这条事实对应的原因') >= 0){ reps[i].click(); return true; }
       }
       return false;
     """)
     time.sleep(0.5)
     back = d.execute("""
-      var b = window.__block('原因与改进');
-      var ins = b.querySelectorAll('.cause-in');
+      var ins = document.querySelectorAll('.cause-in');
       for (var i=0;i<ins.length;i++){
         if (ins[i].value.indexOf('这条事实对应的原因') >= 0)
           return {back: true, value: ins[i].value};
       }
       return {back: false};
     """)
-    check("点「修改」回到输入框并带回原值", back.get("back"), str(back))
+    check("点只读的原因回到输入框并带回原值", back.get("back"), str(back))
 
-    # 收起编辑态，回到只读
+    # 收起编辑态
     d.execute("""
-      var b = window.__block('原因与改进');
-      var ins = b.querySelectorAll('.cause-in');
+      var ins = document.querySelectorAll('.cause-in');
       for (var i=0;i<ins.length;i++){
         if (ins[i].value.indexOf('这条事实对应的原因') >= 0){
-          document.querySelector('[data-act=save-cause][data-fact="' + ins[i].getAttribute('data-fact') + '"]').click();
+          document.querySelector('[data-act=cancel-cause][data-fact="' + ins[i].getAttribute('data-fact') + '"]').click();
           return true;
         }
       }
@@ -602,16 +611,17 @@ def run(d):
     time.sleep(0.5)
 
     act_saved = d.execute("""
-      var v = document.getElementById('view');
-      var items = v.querySelectorAll('.tl-item');
-      var target = null;
-      for (var i=0;i<items.length;i++){
-        var ai = items[i].querySelector('.action-in');
-        if (ai && !ai.value) { target = items[i]; break; }
+      var reps = document.querySelectorAll('.reply[data-act=edit-action]');
+      for (var i=0;i<reps.length;i++){
+        if (reps[i].textContent.indexOf('点击这里锻造新装备') >= 0){ reps[i].click(); return true; }
       }
-      if (!target) return {no: true};
-      var fi = target.querySelector('.action-in').getAttribute('data-fact');
-      var ai = target.querySelector('.action-in');
+      return false;
+    """)
+    time.sleep(0.5)
+    act_saved2 = d.execute("""
+      var ai = document.querySelector('.action-in');
+      if (!ai) return {no: true};
+      var fi = ai.getAttribute('data-fact');
       ai.value = '这条事实对应的改进';
       ai.dispatchEvent(new Event('input', {bubbles:true}));
       document.querySelector('[data-act=save-action][data-fact="' + fi + '"]').click();
@@ -621,8 +631,11 @@ def run(d):
       return {factId: fi, title: a ? a.title : '', actionFactId: a ? a.factId : ''};
     """)
     time.sleep(0.7)
-    check("在事实下面能存下改进", act_saved.get("title") == "这条事实对应的改进", str(act_saved))
-    check("改进挂到了那条事实上", act_saved.get("actionFactId") == act_saved.get("factId"), str(act_saved))
+    check("在事实下面能存下改进",
+          act_saved2.get("title") == "这条事实对应的改进", str(act_saved2))
+    check("改进挂到了那条事实上",
+          act_saved2.get("actionFactId") == act_saved2.get("factId")
+          and act_saved2.get("factId"), str(act_saved2))
 
     # ---------- D2. 删除目标 ----------
     print("\n[D2] 目标页删除目标")
@@ -797,7 +810,8 @@ def run(d):
               text: v.textContent};
     """, [created["id"], "demo-current-clip"])
     time.sleep(0.6)
-    check("对比结果高亮重复原因/未闭环改进", cmp_ui["highlight"] >= 1, str(cmp_ui["highlight"]))
+    check("对比结果高亮重复原因/未闭环改进", cmp_ui["highlight"] >= 1,
+          str(cmp_ui["highlight"]) + " TEXT=" + str(cmp_ui.get("text", ""))[:400])
     check("对比里出现「重复原因」", "重复原因" in cmp_ui["text"], "")
     check("对比里出现「没闭环」", "没闭环" in cmp_ui["text"], "")
 

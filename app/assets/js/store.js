@@ -96,6 +96,7 @@
           id: str(fa.id) || uid('f'),
           content: str(fa.content),
           timelineAt: str(fa.timelineAt),
+          mood: (fa.mood === 'good' || fa.mood === 'flat' || fa.mood === 'bad') ? fa.mood : '',
           createdAt: Number(fa.createdAt) || now()
         });
       }
@@ -318,6 +319,7 @@
       id: uid('f'),
       content: str(data.content),
       timelineAt: str(data.timelineAt),
+      mood: (data.mood === 'good' || data.mood === 'flat' || data.mood === 'bad') ? data.mood : '',
       createdAt: now()
     };
     g.facts.push(f);

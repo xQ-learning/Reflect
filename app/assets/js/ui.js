@@ -37,6 +37,11 @@
   var editingGoal = false;       // 是否处于「修改目标」状态
   var editCauseFact = null;      // 正在修改「原因」的事实 id
   var editActionFact = null;     // 正在修改「改进」的事实 id
+  var expandGoal = false;        // 目标块是否展开编辑
+  var expandResult = false;      // 结果块是否展开编辑
+  var pendingMood = 'bad';       // 新事实的情绪：翻车 / 爽点 / 平平
+  var pendingFactText = '';      // 事实输入框的草稿
+  var resultDraft = { actual: '', gap: '' };   // 结果表单的草稿
 
   // ---------- 工具 ----------
   function $(id) { return document.getElementById(id); }
@@ -237,14 +242,16 @@
     var sub = '<span class="sub">把差距变成下一次的动作</span>';
     var right = '';
     var left = logo;
+    bar.className = 'appbar';
 
     if (route.view === 'view') {
       title = '【 战报回放 】';
       sub = '';
-      left = '<button class="bar-back" data-act="back" aria-label="返回">&lt;</button>';
+      bar.className = 'appbar center';
+      left = '<button class="bar-back" data-act="back" aria-label="返回">&lt; 返回</button>';
       var vg = store.getGoal(route.id);
       if (vg) {
-        right = '<button class="bar-link" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑</button>';
+        right = '<button class="bar-link" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑 &gt;</button>';
       }
     } else if (route.view === 'review') {
       title = '复盘';
@@ -261,6 +268,7 @@
       sub = '';
     }
 
+    if (route.view !== 'view') bar.className = 'appbar';
     bar.innerHTML = left + '<div class="title">' + title + sub + '</div>' + right;
   }
 
@@ -376,6 +384,13 @@
       (extra || '') + '</div>';
   }
 
+  var STEP_ITEMS = [
+    { k: 'goal', icon: '🎯', label: '目标' },
+    { k: 'result', icon: '📊', label: '结果' },
+    { k: 'facts', icon: '📝', label: '事实' },
+    { k: 'causes', icon: '🛠️', label: '归因与装备' }
+  ];
+
   function renderSteps(g) {
     var st = blockStatus(g);
     var order = ['goal', 'result', 'facts', 'causes'];
@@ -384,9 +399,11 @@
       if (!st[order[i]]) { cur = i; break; }
     }
     var h = '<div class="bstrip">';
-    for (var j = 0; j < order.length; j++) {
-      var cls = j < cur ? 'badge verified' : (j === cur ? 'badge running' : 'badge');
-      h += '<span class="' + cls + '">' + (j + 1) + '. ' + esc(BLOCKS[j]) + '</span>';
+    for (var j = 0; j < STEP_ITEMS.length; j++) {
+      var it = STEP_ITEMS[j];
+      var cls = j < cur ? 'chip done' : (j === cur ? 'chip on' : 'chip');
+      h += '<button class="' + cls + '" data-act="goto-sec" data-sec="' + it.k + '">' +
+        it.icon + ' ' + (j + 1) + '.' + esc(it.label) + '</button>';
     }
     h += '</div>';
     return h;
@@ -419,30 +436,15 @@
   }
 
   // ① 目标：只读展示
-  function renderGoalViewBody(goal) {
-    var h = '';
-    h += '<div class="field"><span>目标</span>' +
-      '<div class="col-body">' + esc(goal.goal.description || '（未填写）') + '</div>' +
-      '</div>' +
-      '<div class="field"><span>验证标准</span>';
-    if (goal.goal.criteria.length) {
-      for (var i = 0; i < goal.goal.criteria.length; i++) {
-        h += '<div class="col-body" style="margin-top:4px">· ' + esc(goal.goal.criteria[i]) + '</div>';
-      }
-    } else {
-      h += '<div class="badge alert">尚无验证标准</div>';
-    }
-    h += '</div>';
-    return h;
-  }
-
   // ② 结果
   function renderResultBody(goal) {
     var h = '';
     h += '<label class="field"><span>实际结果</span>' +
-      '<textarea id="r-actual" placeholder="例：5 人中 3 人完成，导出失败率 12%"></textarea></label>' +
+      '<textarea id="r-actual" data-act="r-actual" placeholder="例：5 人中 3 人完成，导出失败率 12%">' +
+      esc(resultDraft.actual) + '</textarea></label>' +
       '<label class="field"><span>目标差距</span>' +
-      '<textarea id="r-gap" placeholder="例：完成率差 20 个百分点"></textarea></label>' +
+      '<textarea id="r-gap" data-act="r-gap" placeholder="例：完成率差 20 个百分点">' +
+      esc(resultDraft.gap) + '</textarea></label>' +
       '<div id="r-metrics"></div>' +
       '<button class="btn sm" data-act="add-metric" style="margin-bottom:10px">+ 添加关键指标</button>' +
       '<button class="btn primary block" data-act="add-result">提交结果</button>';
@@ -502,21 +504,30 @@
     return h;
   }
 
-  // ③ 事实：只负责「记一条」，时间线搬到 ④ 去
-  function renderFactsBody(goal) {
-    var h = '';
-    h += '<label class="field"><span>发生了什么</span>' +
-      '<textarea id="f-content" placeholder="例：用户在模板入口停留超过 40 秒后退出"></textarea></label>' +
-      '<label class="field"><span>时间点</span><input type="text" id="f-time" value="' + esc(nowLocalInput()) + '" placeholder="2026-11-16 14:30"></label>' +
-      '<button class="btn primary block" data-act="add-fact">记下来</button>';
-    if (goal.facts.length) {
-      h += '<div class="muted small" style="margin-top:10px">已记 ' + goal.facts.length +
-        ' 条，去下面的「原因与改进」里归因。</div>';
+  // 差距汇总：放在时间线上面，一眼看清这次差在哪
+  function renderGapSummary(goal) {
+    if (!goal.results.length) return '';
+    var r = goal.results[goal.results.length - 1];
+    var h = '<div class="gap-sum"><div class="gs-t">差距汇总 · ' + fmtTime(r.createdAt) + '</div>';
+    if (r.metrics && r.metrics.length) {
+      var parts = [];
+      for (var m = 0; m < r.metrics.length; m++) {
+        parts.push(esc(r.metrics[m].name) + ' ' + esc(r.metrics[m].value || '—') +
+                   ' / 目标 ' + esc(r.metrics[m].target || '—'));
+      }
+      h += '<div class="gs-s">📊 ' + parts.join(' · ') + '</div>';
     }
+    if (r.gap) h += '<div class="gs-s bad">🔴 ' + esc(r.gap) + '</div>';
+    h += '</div>';
     return h;
   }
 
-  // ④ 原因与改进：事实时间线，每条事实下面挂它的原因和改进
+  function factText(f) {
+    if (!f) return '（事实已删除）';
+    return (f.timelineAt ? f.timelineAt + ' · ' : '') + f.content;
+  }
+
+  // 事实下面挂着的原因与装备
   function causeOfFact(goal, factId) {
     for (var i = 0; i < goal.causes.length; i++) {
       if (goal.causes[i].factId === factId) return goal.causes[i];
@@ -529,106 +540,6 @@
       if (goal.actions[i].factId === factId) return goal.actions[i];
     }
     return null;
-  }
-
-  function factText(f) {
-    if (!f) return '（事实已删除）';
-    return (f.timelineAt ? f.timelineAt + ' · ' : '') + f.content;
-  }
-
-  // 改进条目：只留验证结论与闭环动作，不再显示状态徽章
-  function actionItemHtml(ac) {
-    var h = '';
-    if (ac.verifyResult) {
-      h += '<div class="kv"><b>验证结论：</b>' + esc(ac.verifyResult) + '</div>' +
-        '<div class="muted small">' + fmtTime(ac.closedAt) + ' 闭环</div>';
-    } else {
-      h += '<div class="row" style="gap:6px;margin-top:6px">' +
-        '<button class="btn sm ok" data-act="act-close" data-id="' + esc(ac.id) + '">补录验证</button>' +
-        '<button class="btn sm warn" data-act="act-failed" data-id="' + esc(ac.id) + '">未生效</button>' +
-        '</div>';
-    }
-    return h;
-  }
-
-  // 原因 / 改进这两行：存完是只读（和目标块一样），点「修改」才回到输入框
-  // ro=true 时是审阅页的纯展示：没有输入框，也没有「修改」
-  function factLine(label, item, factId, kind, ro) {
-    var editing = (kind === 'cause') ? (editCauseFact === factId) : (editActionFact === factId);
-    var h = '<div class="fact-ln"><span class="fl-h">' + label + '</span>';
-    if (ro) {
-      if (item) {
-        h += '<div class="fl-ro"><span class="grow">' + esc(item.text || item.title) + '</span></div>';
-      } else {
-        h += '<div class="muted small">—</div>';
-      }
-    } else if (item && !editing) {
-      h += '<div class="fl-ro"><span class="grow">' + esc(item.text || item.title) + '</span>' +
-        '<button class="btn sm ghost" data-act="edit-' + kind + '" data-fact="' + esc(factId) + '">修改</button></div>';
-    } else {
-      var val = item ? (item.text || item.title) : '';
-      var ph = kind === 'cause' ? '例：模板入口太多，新手卡住了' : '例：默认推荐一个模板';
-      h += '<div class="crit-row"><input type="text" class="' + kind + '-in" data-fact="' + esc(factId) +
-        '" value="' + esc(val) + '" placeholder="' + ph + '">' +
-        '<button class="btn sm ghost" data-act="save-' + kind + '" data-fact="' + esc(factId) + '">存</button></div>';
-    }
-    h += '</div>';
-    return h;
-  }
-
-  function renderCausesBody(goal) {
-    var h = '';
-    h += '<div class="hint">在每条事实下面写它的原因和改进。</div>';
-    var latestResult = renderLatestResult(goal);
-    if (latestResult) {
-      h += '<div class="muted small" style="margin-top:12px">差距汇总</div>';
-      h += latestResult;
-    }
-
-    var facts = goal.facts.slice().sort(byTimeline);
-
-    if (!facts.length) {
-      h += '<div class="muted small" style="margin-top:12px">还没有事实。先在上面记一条，才能归因和改进。</div>';
-      return h;
-    }
-
-    h += '<div class="muted small" style="margin-top:12px">时间线（' + facts.length + '）</div>';
-    h += '<div class="timeline" style="margin-top:8px">';
-    for (var i = 0; i < facts.length; i++) {
-      var f = facts[i];
-      var cause = causeOfFact(goal, f.id);
-      var action = actionOfFact(goal, f.id);
-      h += '<div class="tl-item">' +
-        '<div class="tl-time">' + esc(f.timelineAt || '未标时间') + '</div>' +
-        '<div class="tl-body">' +
-        '<div class="fact-txt">' + esc(f.content) + '</div>' +
-        factLine('原因', cause, f.id, 'cause') +
-        factLine('改进', action, f.id, 'action') +
-        (action ? actionItemHtml(action) : '') +
-        '<div class="row end" style="margin-top:6px">' +
-        '<button class="btn sm ghost" data-act="del-fact" data-id="' + esc(f.id) + '">删除事实</button></div>' +
-        '</div></div>';
-    }
-    h += '</div>';
-
-    // 历史数据：没有锚到事实上的原因/改进，只读列出，可删
-    var orphanCauses = goal.causes.filter(function (c) { return !c.factId || !factById(goal, c.factId); });
-    var orphanActions = goal.actions.filter(function (a) { return !a.factId || !factById(goal, a.factId); });
-    if (orphanCauses.length || orphanActions.length) {
-      h += '<hr class="sep"><div class="sub-card"><div class="muted small">历史数据：没有对应事实的条目</div>';
-      for (var oc = 0; oc < orphanCauses.length; oc++) {
-        h += '<div class="row between" style="margin-top:6px">' +
-          '<span class="kv" style="color:var(--text)">原因 · ' + esc(orphanCauses[oc].text) + '</span>' +
-          '<button class="btn sm ghost" data-act="del-cause" data-id="' + esc(orphanCauses[oc].id) + '">删</button></div>';
-      }
-      for (var oa = 0; oa < orphanActions.length; oa++) {
-        h += '<div class="row between" style="margin-top:6px">' +
-          '<span class="kv" style="color:var(--text)">改进 · ' + esc(orphanActions[oa].title) + '</span>' +
-          '<button class="btn sm ghost" data-act="del-action" data-id="' + esc(orphanActions[oa].id) + '">删</button></div>';
-      }
-      h += '</div>';
-    }
-    return h;
   }
 
   function factById(goal, id) {
@@ -644,6 +555,128 @@
     results: [], facts: [], causes: [], actions: []
   };
 
+  // 折叠时的摘要
+  function goalSummary(goal) {
+    var h = '<div class="sum-t">' + esc(goal.goal.description || '（未填写）') + '</div>';
+    if (goal.goal.criteria.length) {
+      var cs = [];
+      for (var i = 0; i < goal.goal.criteria.length; i++) cs.push(esc(goal.goal.criteria[i]));
+      h += '<div class="sum-s">验证：' + cs.join(' / ') + '</div>';
+    } else {
+      h += '<div class="sum-s muted">验证：还没写标准</div>';
+    }
+    return h;
+  }
+
+  function resultSummary(goal) {
+    var r = goal.results.length ? goal.results[goal.results.length - 1] : null;
+    if (!r) return '<div class="sum-s muted">还没有结果</div>';
+    var h = '<div class="sum-t">实际：' + esc(r.actual || '（未填写）') + '</div>';
+    if (r.metrics && r.metrics.length) {
+      var parts = [];
+      for (var m = 0; m < r.metrics.length; m++) {
+        parts.push(esc(r.metrics[m].name) + ' ' + esc(r.metrics[m].value));
+      }
+      h += '<div class="sum-s">📊 ' + parts.join(' · ') + '</div>';
+    }
+    h += '<div class="sum-s bad">' + (r.gap ? '🔴 差距：' + esc(r.gap) : '🔴 差距：还没记') + '</div>';
+    return h;
+  }
+
+  // 事实卡片：大卡片 + 下面的「回复」（原因 / 装备）
+  function renderFactCard(f, goal, anchor) {
+    var cause = causeOfFact(goal, f.id);
+    var action = actionOfFact(goal, f.id);
+    var h = '<div class="chat-card">' +
+      '<button class="chat-del" data-act="del-fact" data-id="' + esc(f.id) + '" aria-label="删除事实">🗑️</button>' +
+      '<div class="chat-fact">' + MOOD[moodOf(f)] + ' ' + esc(f.content) + '</div>';
+
+    // 原因
+    if (editCauseFact === f.id) {
+      h += '<div class="reply edit"' + (anchor ? ' id="' + anchor + '"' : '') + '>' +
+        '<input type="text" class="cause-in" data-fact="' + esc(f.id) + '" value="' + esc(cause ? cause.text : '') +
+        '" placeholder="这条事实的原因">' +
+        '<span class="row" style="gap:6px;margin-top:6px">' +
+        '<button class="btn sm ghost" data-act="save-cause" data-fact="' + esc(f.id) + '">存</button>' +
+        '<button class="btn sm ghost" data-act="cancel-cause" data-fact="' + esc(f.id) + '">取消</button>' +
+        '</span></div>';
+    } else {
+      h += '<div class="reply" data-act="edit-cause" data-fact="' + esc(f.id) + '">' +
+        (cause ? '🔍 原因：' + esc(cause.text)
+               : '<span class="ghost">💬 点击这里补充原因...</span>') + '</div>';
+    }
+
+    // 装备
+    if (editActionFact === f.id) {
+      h += '<div class="reply edit"><input type="text" class="action-in" data-fact="' + esc(f.id) +
+        '" value="' + esc(action ? action.title : '') + '" placeholder="要做什么改进">' +
+        '<span class="row" style="gap:6px;margin-top:6px">' +
+        '<button class="btn sm ghost" data-act="save-action" data-fact="' + esc(f.id) + '">存</button>' +
+        '<button class="btn sm ghost" data-act="cancel-action" data-fact="' + esc(f.id) + '">取消</button>' +
+        '</span></div>';
+    } else {
+      h += '<div class="reply" data-act="edit-action" data-fact="' + esc(f.id) + '">' +
+        (action ? '🔧 装备：' + esc(action.title)
+                : '<span class="ghost">🛠️ 点击这里锻造新装备...</span>') + '</div>';
+      if (action) {
+        h += '<div class="reply"><span class="st-chip" data-act="toggle-status" data-id="' + esc(action.id) +
+          '">[状态: ' + actionStatusText(action) + ']</span></div>';
+      }
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // 事实与归因：像聊天记录一样，事实是大卡片，原因和装备是下面的回复
+  function renderChatBody(goal) {
+    var facts = goal.facts.slice().sort(byTimeline);
+    var h = renderGapSummary(goal);
+    if (facts.length) {
+      h += '<div class="chat">';
+      for (var i = 0; i < facts.length; i++) {
+        h += '<div class="tl-item">' +
+          '<div class="tl-time">🕒 ' + esc(shortTime(facts[i].timelineAt) || '未标时间') + '</div>' +
+          renderFactCard(facts[i], goal, i === 0 ? 'sec-cause' : null) +
+          '</div>';
+      }
+      h += '</div>';
+    } else {
+      h += '<div class="muted small">还没有事实。写下第一条，下面就能接着归因、锻造装备。</div>';
+    }
+
+    // 写一条新事实
+    h += '<div class="newfact">' +
+      '<div class="nf-t">▼ 写一条新事实 / 记录新情况</div>' +
+      '<div class="nf-moods">' +
+      '<button class="mood' + (pendingMood === 'bad' ? ' on' : '') + '" data-act="set-mood" data-mood="bad">🔴 翻车</button>' +
+      '<button class="mood' + (pendingMood === 'good' ? ' on' : '') + '" data-act="set-mood" data-mood="good">🟢 爽点</button>' +
+      '<button class="mood' + (pendingMood === 'flat' ? ' on' : '') + '" data-act="set-mood" data-mood="flat">🟡 平平</button>' +
+      '</div>' +
+      '<textarea id="f-content" data-act="f-content" placeholder="记录刚刚发生了什么...">' + esc(pendingFactText) + '</textarea>' +
+      '<div class="row end" style="margin-top:8px">' +
+      '<button class="btn primary" data-act="add-fact">记下来</button></div>' +
+      '</div>';
+
+    // 历史数据：没有锚到事实上的原因/改进
+    var orphanCauses = goal.causes.filter(function (c) { return !c.factId || !factById(goal, c.factId); });
+    var orphanActions = goal.actions.filter(function (a) { return !a.factId || !factById(goal, a.factId); });
+    if (orphanCauses.length || orphanActions.length) {
+      h += '<hr class="sep"><div class="sub-card"><div class="muted small">历史数据：没有对应事实的条目</div>';
+      for (var oc = 0; oc < orphanCauses.length; oc++) {
+        h += '<div class="row between" style="margin-top:6px">' +
+          '<span class="kv" style="color:var(--text)">原因 · ' + esc(orphanCauses[oc].text) + '</span>' +
+          '<button class="btn sm ghost" data-act="del-cause" data-id="' + esc(orphanCauses[oc].id) + '">删</button></div>';
+      }
+      for (var oa = 0; oa < orphanActions.length; oa++) {
+        h += '<div class="row between" style="margin-top:6px">' +
+          '<span class="kv" style="color:var(--text)">装备 · ' + esc(orphanActions[oa].title) + '</span>' +
+          '<button class="btn sm ghost" data-act="del-action" data-id="' + esc(orphanActions[oa].id) + '">删</button></div>';
+      }
+      h += '</div>';
+    }
+    return h;
+  }
+
   function renderReview(goal) {
     var h = '';
     var isNew = !goal;
@@ -652,14 +685,35 @@
 
     h += renderSteps(g);
 
-    h += '<div class="card">' +
-      blockHead('1', '目标', st.goal,
-        (isNew || editingGoal) ? '' : '<button class="btn sm blk-act" data-act="edit-goal">修改</button>') +
-      ((isNew || editingGoal) ? renderGoalFormBody(isNew) : renderGoalViewBody(goal)) + '</div>';
+    // ① 目标：填好了就折叠，点一下展开
+    var goalOpen = isNew || editingGoal || expandGoal || !st.goal;
+    h += '<div class="card sec" id="sec-goal">';
+    if (goalOpen) {
+      h += blockHead('1', '🎯 目标', st.goal,
+        (isNew || editingGoal) ? '' : '<button class="btn sm blk-act" data-act="cancel-edit">收起</button>') +
+        renderGoalFormBody(isNew);
+    } else {
+      h += '<div class="sec-h" data-act="expand-goal"><span class="sec-t">🎯 目标</span>' +
+        '<span class="sec-tip">点击展开修改</span></div>' +
+        '<div class="sec-sum" data-act="expand-goal">' + goalSummary(goal) + '</div>';
+    }
+    h += '</div>';
 
-    h += '<div class="card">' + blockHead('2', '结果', st.result) + renderResultBody(g) + '</div>';
-    h += '<div class="card">' + blockHead('3', '事实', st.facts) + renderFactsBody(g) + '</div>';
-    h += '<div class="card">' + blockHead('4', '原因与改进', st.causes) + renderCausesBody(g) + '</div>';
+    // ② 结果
+    var resultOpen = expandResult || !st.result;
+    h += '<div class="card sec" id="sec-result">';
+    if (resultOpen) {
+      h += blockHead('2', '📊 结果', st.result) + renderResultBody(g);
+    } else {
+      h += '<div class="sec-h" data-act="expand-result"><span class="sec-t">📊 结果</span>' +
+        '<span class="sec-tip">点击展开修改</span></div>' +
+        '<div class="sec-sum" data-act="expand-result">' + resultSummary(goal) + '</div>';
+    }
+    h += '</div>';
+
+    // ③ 事实与归因
+    h += '<div class="card sec" id="sec-facts">' +
+      blockHead('3', '📝 事实与归因', st.facts) + renderChatBody(g) + '</div>';
 
     if (!isNew) {
       h += '<button class="btn primary block" data-act="submit-review" style="margin-top:16px">' +
@@ -669,9 +723,16 @@
     return h;
   }
 
-  // ---------- 战报回放（只读）：预期 vs 现实 + 经验流 ----------
+  // ---------- 战报回放（只读）：预期 vs 现实 + 经验时间线 ----------
   // 事实的颜色：文本里带正向词就算好消息
   var GOOD_WORDS = ['爽', '成功', '顺利', '满意', '喜欢', '不错', '顺畅', '提升', '省时', '省心'];
+  var MOOD = { bad: '🔴', good: '🟢', flat: '🟡' };
+
+  // 情绪：优先用记录时选的那个，老数据按文本猜
+  function moodOf(f) {
+    if (f && f.mood && MOOD[f.mood]) return f.mood;
+    return isGoodFact(f ? f.content : '') ? 'good' : 'bad';
+  }
 
   function isGoodFact(text) {
     var t = String(text || '');
@@ -715,7 +776,7 @@
               ? '<div class="muted small">验证结论：' + esc(action.verifyResult) + '</div>' +
                 '<div class="muted small">' + fmtTime(action.closedAt) + ' 闭环</div>'
               : '')
-          : '<span class="muted small">还没有装备</span>') + '</div></div>' +
+          : '<span class="muted small">暂无经验沉淀</span>') + '</div></div>' +
         '</div></div>';
     }
     h += '</div>';
@@ -727,7 +788,7 @@
     var r = goal.results.length ? goal.results[goal.results.length - 1] : null;
     var badge = statusBadge(goal);
     var h = '<div class="card dark">' +
-      '<div class="mdl-h">📦 预期 vs 现实</div>' +
+      '<div class="mdl-h">📊 预期 vs 现实</div>' +
       '<div class="row between" style="align-items:flex-start;gap:8px">' +
       '<div class="goal-t">🎯 ' + esc(goal.goal.description || '（未填目标）') + '</div>' +
       '<span class="badge ' + badge[0] + '">' + badge[1] + '</span></div>';
@@ -773,7 +834,7 @@
   function renderBattle(goal) {
     var h = '';
     h += renderExpectVsReal(goal);
-    h += '<div class="card"><div class="mdl-h">📦 经验流</div>' + renderExpFlow(goal) + '</div>';
+    h += '<div class="card"><div class="mdl-h">🕰️ 经验时间线</div>' + renderExpFlow(goal) + '</div>';
     return h;
   }
 
@@ -899,6 +960,11 @@
       else document.body.classList.remove('no-tabs');
     }
     renderAppbar();
+    // 顶栏高度写进 CSS 变量，悬浮步骤条据此定位（要等顶栏渲染完再量）
+    var ab0 = $('appbar');
+    if (ab0 && document.documentElement) {
+      document.documentElement.style.setProperty('--appbar-h', Math.round(ab0.getBoundingClientRect().height) + 'px');
+    }
     var view = $('view');
     if (!view) return;
 
@@ -951,6 +1017,8 @@
     if (goalFormId !== route.id) {
       goalFormId = route.id;
       editingGoal = false;
+      expandGoal = false;
+      expandResult = false;
       seedGoalForm(g);
       pendingMetrics = [];
     }
@@ -1233,6 +1301,7 @@
       }
       if (actEl === 'cancel-edit') {
         editingGoal = false;
+        expandGoal = false;
         seedGoalForm(store.getGoal(route.id));
         render();
         return;
@@ -1268,6 +1337,7 @@
           store.updateGoal(route.id, { description: desc.trim(), criteria: check.criteria });
           notify('目标已更新', 'ok');
           editingGoal = false;
+          expandGoal = false;
           seedGoalForm(store.getGoal(route.id));
           render();
         }
@@ -1294,6 +1364,8 @@
         if (!rg) return;
         store.addResult(rg.id, { actual: actual, gap: gap, metrics: metrics });
         pendingMetrics = [];
+        resultDraft = { actual: '', gap: '' };
+        expandResult = false;
         notify('结果已记下', 'ok');
         render();
         return;
@@ -1311,20 +1383,82 @@
       if (actEl === 'add-fact') {
         var content = ($('f-content') || {}).value || '';
         if (!content.trim()) { toast('请写下发生了什么', 'err'); return; }
-        var factTime = ($('f-time') || {}).value || '';
         var fg = ensureGoal();
         if (!fg) return;
-        store.addFact(fg.id, { content: content, timelineAt: factTime });
+        store.addFact(fg.id, { content: content.trim(), timelineAt: nowLocalInput(), mood: pendingMood });
+        pendingFactText = '';
         notify('事实已记下', 'ok');
         render();
         return;
       }
+      if (actEl === 'set-mood') {
+        var mood = el.getAttribute('data-mood') || 'bad';
+        pendingMood = (mood === 'good' || mood === 'flat') ? mood : 'bad';
+        pendingFactText = ($('f-content') || {}).value || pendingFactText;
+        render();
+        return;
+      }
       if (actEl === 'del-fact') {
-        confirmBox('确定删除这条事实？', function () {
-          store.removeFact(route.id, id);
-          notify('事实已删除', 'ok');
+        store.removeFact(route.id, id);
+        notify('事实已删除', 'ok');
+        render();
+        return;
+      }
+      if (actEl === 'expand-goal') {
+        expandGoal = true;
+        editingGoal = false;
+        seedGoalForm(store.getGoal(route.id));
+        render();
+        return;
+      }
+      if (actEl === 'expand-result') {
+        expandResult = true;
+        // 展开时把最近一次提交带回表单，直接改
+        var rg2 = store.getGoal(route.id);
+        if (rg2 && rg2.results.length) {
+          var lr = rg2.results[rg2.results.length - 1];
+          resultDraft = { actual: lr.actual || '', gap: lr.gap || '' };
+          pendingMetrics = (lr.metrics || []).slice();
+        }
+        render();
+        return;
+      }
+      if (actEl === 'goto-sec') {
+        var sec = el.getAttribute('data-sec');
+        var target = $('sec-' + sec);
+        if (target && target.scrollIntoView) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
+      if (actEl === 'toggle-status') {
+        var tid = id;
+        var tAct = null;
+        var allGoals = store.getGoals();
+        for (var ti = 0; ti < allGoals.length; ti++) {
+          for (var tj = 0; tj < allGoals[ti].actions.length; tj++) {
+            if (allGoals[ti].actions[tj].id === tid) tAct = allGoals[ti].actions[tj];
+          }
+        }
+        if (!tAct) return;
+        if (tAct.status === 'verified') {
+          var back = store.updateAction(tid, { status: 'open', verifyResult: '' });
+          if (!back.ok) { toast(back.error, 'err'); return; }
+          notify('改回待验证', 'ok');
           render();
-        });
+          return;
+        }
+        openCloseDialog(tAct, 'verified');
+        return;
+      }
+      if (actEl === 'cancel-cause') {
+        editCauseFact = null;
+        render();
+        return;
+      }
+      if (actEl === 'cancel-action') {
+        editActionFact = null;
+        render();
         return;
       }
 
@@ -1476,6 +1610,9 @@
       if (!el || !el.getAttribute) return;
 
       if (el.id === 'g-desc') { goalForm.description = el.value; return; }
+      if (el.id === 'f-content') { pendingFactText = el.value; return; }
+      if (el.id === 'r-actual') { resultDraft.actual = el.value; return; }
+      if (el.id === 'r-gap') { resultDraft.gap = el.value; return; }
       if (el.className && el.className.indexOf('g-crit') >= 0) {
         var gi = parseInt(el.getAttribute('data-i'), 10);
         if (!isNaN(gi) && goalForm.criteria[gi] !== undefined) goalForm.criteria[gi] = el.value;

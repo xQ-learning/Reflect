@@ -185,7 +185,7 @@ def run(d):
     time.sleep(0.3)
     d.execute("location.hash = '#/review/demo-current-clip'; return true;")
     time.sleep(0.6)
-    d.execute("document.querySelector('[data-act=act-close]').click(); return true;")
+    d.execute("document.querySelector('[data-act=toggle-status]').click(); return true;")
     time.sleep(0.6)
     r = d.execute("""
       var m = document.querySelector('.modal');
