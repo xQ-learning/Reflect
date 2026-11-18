@@ -124,7 +124,10 @@ def run(d):
     time.sleep(0.6)
     fresh = d.execute("""
       var v = document.getElementById('view');
-      return {hash: location.hash,
+      var heads = [];
+      var hs = v.querySelectorAll('.blk-h h2');
+      for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
+      return {hash: location.hash, heads: heads,
               hasDesc: !!document.getElementById('g-desc'),
               hasResult: !!document.getElementById('r-actual'),
               hasFact: !!document.getElementById('f-content'),
@@ -133,8 +136,10 @@ def run(d):
               hasSubmit: !!v.querySelector('[data-act=submit-review]')};
     """)
     check("点复盘页签进入新的复盘", fresh["hash"] == "#/review/new", fresh["hash"])
-    check("新复盘只有目标块", fresh["hasDesc"] and not fresh["hasResult"]
-          and not fresh["hasFact"] and not fresh["hasCause"] and not fresh["hasAction"], str(fresh))
+    check("新复盘直接就是纵向四块",
+          fresh["heads"] == ["目标", "结果", "事实", "原因与改进"], str(fresh["heads"]))
+    check("四块的内容区都在", fresh["hasDesc"] and fresh["hasResult"] and fresh["hasFact"]
+          and fresh["hasCause"] and fresh["hasAction"], str(fresh))
     check("目标没建好时不显示提交按钮", not fresh["hasSubmit"], str(fresh["hasSubmit"]))
 
     # 点目标页的卡片 → 打开那个目标的四块
@@ -169,24 +174,27 @@ def run(d):
     time.sleep(0.5)
     form = d.execute("""
       var v = document.getElementById('view');
-      var cols = v.querySelectorAll('.cols');
-      var heads = [];
-      if (cols.length) {
-        var hs = cols[0].querySelectorAll('.col-h');
-        for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
-      }
-      return {colCount: cols.length, heads: heads,
+      var desc = document.getElementById('g-desc');
+      var crit = v.querySelector('#g-criteria');
+      var dr = desc.getBoundingClientRect();
+      var cr = crit.getBoundingClientRect();
+      return {colCount: v.querySelectorAll('.cols').length,
+              descTop: Math.round(dr.top), critTop: Math.round(cr.top),
+              descWidth: Math.round(dr.width), critWidth: Math.round(cr.width),
               hasDesc: !!document.getElementById('g-desc'),
               hasCrit: !!v.querySelector('#g-criteria .g-crit'),
               hasAddCrit: !!v.querySelector('[data-act=add-crit]'),
               hasSave: !!v.querySelector('[data-act=save-goal]'),
               text: v.textContent};
     """)
-    check("目标表单是两栏布局", form["colCount"] == 1, str(form["colCount"]))
-    check("两栏分别是「目标」与「验证标准」",
-          form["heads"][:2] == ["目标", "验证标准"], str(form["heads"]))
-    check("左栏是目标描述输入", form["hasDesc"], str(form["hasDesc"]))
-    check("右栏是验证标准输入", form["hasCrit"], str(form["hasCrit"]))
+    check("目标块不是左右两栏", form["colCount"] == 0, str(form["colCount"]))
+    check("目标描述在上、验证标准在下", form["descTop"] < form["critTop"],
+          "desc=%s crit=%s" % (form["descTop"], form["critTop"]))
+    check("上下两块同宽（都占满整行）",
+          abs(form["descWidth"] - form["critWidth"]) <= 2,
+          "desc=%s crit=%s" % (form["descWidth"], form["critWidth"]))
+    check("有目标描述输入", form["hasDesc"], str(form["hasDesc"]))
+    check("有验证标准输入", form["hasCrit"], str(form["hasCrit"]))
     check("验证标准可以再加一条", form["hasAddCrit"], str(form["hasAddCrit"]))
     check("有「创建目标」按钮", form["hasSave"], str(form["hasSave"]))
 
@@ -240,14 +248,21 @@ def run(d):
 
     blocks = d.execute("""
       var v = document.getElementById('view');
-      return {result: !!document.getElementById('r-actual'),
+      var heads = [];
+      var hs = v.querySelectorAll('.blk-h h2');
+      for (var i=0;i<hs.length;i++) heads.push(hs[i].textContent.trim());
+      return {heads: heads,
+              result: !!document.getElementById('r-actual'),
               fact: !!document.getElementById('f-content'),
               cause: !!document.getElementById('c-text'),
               action: !!document.getElementById('a-title'),
-              submit: !!v.querySelector('[data-act=submit-review]')};
+              submit: !!v.querySelector('[data-act=submit-review]'),
+              edit: !!v.querySelector('[data-act=edit-goal]'),
+              form: !!document.getElementById('g-desc')};
     """)
-    check("创建后后面三块出现", blocks["result"] and blocks["fact"]
-          and blocks["cause"] and blocks["action"], str(blocks))
+    check("创建后仍是纵向四块", blocks["heads"] == ["目标", "结果", "事实", "原因与改进"],
+          str(blocks["heads"]))
+    check("创建后目标块变只读并可修改", blocks["edit"] and not blocks["form"], str(blocks))
     check("创建后可以提交复盘", blocks["submit"], str(blocks["submit"]))
 
     # 修改即覆盖
@@ -269,6 +284,36 @@ def run(d):
     check("修改后覆盖原目标", "很快" in edited["desc"], str(edited))
     check("修改后验证标准被覆盖", edited["criteria"] == ["10 分钟内出片"], str(edited["criteria"]))
     check("修改不新增目标", edited["count"] == before + 1, str(edited["count"]))
+
+    # 没建目标时直接往下记 → 自动先把目标建出来
+    d.execute("location.hash = '#/review/new'; return true;")
+    time.sleep(0.5)
+    d.execute("""
+      var ins = document.querySelectorAll('#g-criteria .g-crit');
+      ins[0].value = '自动建目标时的验证标准';
+      ins[0].dispatchEvent(new Event('input', {bubbles:true}));
+      var dd = document.getElementById('g-desc');
+      dd.value = '还没建目标就想记结果';
+      dd.dispatchEvent(new Event('input', {bubbles:true}));
+      var r = document.getElementById('r-actual');
+      r.value = '直接记下的实际结果';
+      document.querySelector('[data-act=add-result]').click();
+      return true;
+    """)
+    time.sleep(0.9)
+    auto_state = d.execute("""
+      var gs = window.Reflect.store.getGoals();
+      var g = gs[gs.length-1];
+      return {count: gs.length, hash: location.hash,
+              desc: g.goal.description, results: g.results.length,
+              actual: g.results.length ? g.results[0].actual : '',
+              criteria: g.goal.criteria};
+    """)
+    check("没建目标就往下记会自动创建目标", auto_state["count"] == before + 2, str(auto_state["count"]))
+    check("自动创建的目标带着描述与验证标准",
+          "还没建目标" in auto_state["desc"] and len(auto_state["criteria"]) == 1, str(auto_state))
+    check("结果记到了自动创建的目标上",
+          auto_state["results"] == 1 and auto_state["actual"] == "直接记下的实际结果", str(auto_state))
 
     # ---------- C. 其余三块的形态 ----------
     print("\n[C] 结果 / 事实 / 原因与改进")

@@ -69,6 +69,12 @@ PROBE = """
       if (tr.right / Z > out.winW + 2 || tr.left / Z < -2) out.tabAllVisible = false;
     }
     out.tabWidth = Math.round(tb.children[0].getBoundingClientRect().width / Z);
+    out.tabBarWidth = Math.round(tb.getBoundingClientRect().width / Z);
+    // 三个页签等宽并填满整条底栏
+    out.tabWidths = [];
+    for (var k = 0; k < tb.children.length; k++) {
+      out.tabWidths.push(Math.round(tb.children[k].getBoundingClientRect().width / Z));
+    }
   }
   var ab = document.getElementById('appbar');
   if (ab) { out.appbarH = Math.round(ab.getBoundingClientRect().height / Z); }
@@ -123,6 +129,11 @@ def run(d):
                   "bodyPad=%s tabH=%s" % (r.get("bodyPad"), r.get("tabbarH")))
             check("%s 三个页签都在视口内" % label, r.get("tabAllVisible") and r.get("tabCount") == 3,
                   "count=%s" % r.get("tabCount"))
+            widths = r.get("tabWidths") or []
+            check("%s 三个页签等宽填满底栏" % label,
+                  len(widths) == 3 and max(widths) - min(widths) <= 2
+                  and sum(widths) >= r.get("tabBarWidth", 0) * 0.9,
+                  "widths=%s bar=%s" % (widths, r.get("tabBarWidth")))
 
     # 补录验证弹层
     print("\n[布局] 补录验证弹层")
