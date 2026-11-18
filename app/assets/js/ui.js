@@ -11,10 +11,26 @@
   var compare = R.compare;
   var exporter = R.export;
 
+  // 底栏图标：目标=靶心，复盘=时钟倒转，统计=雷达（线性描边，不填充）
   var TABS = [
-    { key: 'goals', label: '目标', icon: 'M4 6h16M4 12h16M4 18h10' },
-    { key: 'review', label: '复盘', icon: 'M4 19h16M4 9h16M4 14h10' },
-    { key: 'stats', label: '统计', icon: 'M4 20V11M10 20V4M16 20v-7M2 20h20' }
+    {
+      key: 'goals', label: '目标',
+      icon: '<circle cx="12" cy="12" r="8.4"></circle>' +
+            '<circle cx="12" cy="12" r="3.6"></circle>'
+    },
+    {
+      key: 'review', label: '复盘',
+      icon: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>' +
+            '<path d="M3 3v5h5"></path>' +
+            '<path d="M12 8.2v4.2l2.9 1.7"></path>'
+    },
+    {
+      key: 'stats', label: '统计',
+      icon: '<circle cx="12" cy="12" r="8.4"></circle>' +
+            '<path d="M12 12V4.3A7.7 7.7 0 0 1 19.7 12"></path>' +
+            '<path d="M12 12l5.8-5.8"></path>' +
+            '<circle cx="15.7" cy="9.2" r="1.1"></circle>'
+    }
   ];
 
   // 复盘页的四块
@@ -235,7 +251,7 @@
     if (!bar) return;
 
     var logo =
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#d4af37" stroke-width="1.8" stroke-linecap="round">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#7f858f" stroke-width="1.7" stroke-linecap="round">' +
       '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>';
 
     var title = 'Reflect';
@@ -283,8 +299,8 @@
     for (var i = 0; i < TABS.length; i++) {
       var t = TABS[i];
       h += '<button class="tab' + (activeTab === t.key ? ' on' : '') + '" data-act="tab" data-tab="' + t.key + '">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-        '<path d="' + t.icon + '"></path></svg>' + esc(t.label) + '</button>';
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+        t.icon + '</svg>' + esc(t.label) + '</button>';
     }
     bar.innerHTML = h;
   }
@@ -371,9 +387,9 @@
   function gearLine(g) {
     var total = g.actions.length;
     var pending = g.actions.filter(function (a) { return a.status !== 'verified'; }).length;
-    if (!total) return '<div class="gear muted">🔥 还没掉落装备</div>';
-    return '<div class="gear">🔥 已掉落 ' + total + ' 件装备' +
-      (pending ? '<span class="gear-wait">（待验证）</span>' : '<span class="gear-ok">（已闭环）</span>') +
+    if (!total) return '<div class="gear muted">还没掉落装备</div>';
+    return '<div class="gear">已掉落 ' + total + ' 件装备' +
+      (pending ? '<span class="gear-wait">待验证 ' + pending + '</span>' : '<span class="gear-ok">已闭环</span>') +
       '</div>';
   }
 
@@ -622,8 +638,8 @@
         var stCls = action.status === 'verified' ? 'verified'
                    : action.status === 'failed' ? 'failed' : 'pending';
         var stTxt = action.status === 'verified' ? '✓ 已闭环' : actionStatusText(action);
-        h += '<div class="reply"><span class="st-chip ' + stCls + '" data-act="toggle-status" data-id="' +
-          esc(action.id) + '">[' + stTxt + ']</span></div>';
+        h += '<div class="reply"><button class="st-hit" data-act="toggle-status" data-id="' +
+          esc(action.id) + '"><span class="st-chip ' + stCls + '">' + esc(stTxt) + '</span></button></div>';
       }
     }
     h += '</div>';

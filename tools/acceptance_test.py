@@ -131,12 +131,12 @@ def run(d):
               hasKpi: !!c.querySelector('.kpi'),
               hasGear: !!c.querySelector('.gear'),
               hasBoom: c.textContent.indexOf('💥') >= 0,
-              hasFire: c.textContent.indexOf('🔥') >= 0};
+              hasGearText: c.textContent.indexOf('已掉落') >= 0};
     """)
     check("目标卡片没有进度条", not card.get("hasProgress"), str(card))
     check("目标卡片有核心数据行", card.get("hasKpi"), str(card))
     check("目标卡片有装备掉落行", card.get("hasGear"), str(card))
-    check("目标卡片带 💥 与 🔥", card.get("hasBoom") and card.get("hasFire"), str(card))
+    check("目标卡片带 💥 与装备掉落行", card.get("hasBoom") and card.get("hasGearText"), str(card))
 
     # 点「复盘」页签 = 开一次新的复盘
     d.execute("document.querySelector('#tabbar .tab[data-tab=review]').click(); return true;")
