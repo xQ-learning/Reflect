@@ -235,7 +235,7 @@
     if (!bar) return;
 
     var logo =
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#d4af37" stroke-width="1.8" stroke-linecap="round">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round">' +
       '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>';
 
     var title = 'Reflect';
@@ -616,7 +616,7 @@
         '</span></div>';
     } else {
       h += '<div class="reply" data-act="edit-action" data-fact="' + esc(f.id) + '">' +
-        (action ? '<b>🔧 装备：</b>' + esc(action.title)
+        (action ? '<b class="k-gear">🔧 装备：</b>' + esc(action.title)
                 : '<span class="ghost">🛠️ 点击这里锻造新装备...</span>') + '</div>';
       if (action) {
         var stCls = action.status === 'verified' ? 'verified'
