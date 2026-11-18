@@ -474,6 +474,57 @@ table.tbl th { color: var(--muted); font-weight: 500; background: var(--bg-soft)
 .steps .st.on { background: var(--accent); }
 .steps .st.done { background: rgba(77,141,250,.45); }
 
+/* ---------- 复盘页：四块 ---------- */
+.blk-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.blk-h h2 { margin: 0; font-size: 16px; flex: 0 0 auto; }
+.blk-n {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: #cfe0ff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.blk-h .badge { margin-left: auto; }
+.blk-h .blk-act { margin-left: 8px; flex: 0 0 auto; }
+
+/* 四步进度 */
+.bstrip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+  margin-bottom: 12px;
+}
+.bstrip .badge { flex: 0 0 auto; }
+
+/* ---------- 统计页 ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.stat-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.stat-box .n { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.stat-box .l { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
 /* 选项按钮组 */
 .opts { display: flex; flex-wrap: wrap; gap: 8px; }
 .opt {

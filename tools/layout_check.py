@@ -61,9 +61,13 @@ PROBE = """
     var pad = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
     out.bodyPad = Math.round(pad);
     out.contentClear = pad >= out.tabbarH - 2;
-    // tab 可横向滚动，6 个 tab 是否都能通过滚动到达
-    out.tabScrollable = tb.scrollWidth > tb.clientWidth;
+    // 三个页签是否都在视口内（不靠横向滚动）
     out.tabCount = tb.children.length;
+    out.tabAllVisible = true;
+    for (var i = 0; i < tb.children.length; i++) {
+      var tr = tb.children[i].getBoundingClientRect();
+      if (tr.right / Z > out.winW + 2 || tr.left / Z < -2) out.tabAllVisible = false;
+    }
     out.tabWidth = Math.round(tb.children[0].getBoundingClientRect().width / Z);
   }
   var ab = document.getElementById('appbar');
@@ -93,17 +97,12 @@ def run(d):
     ZOOM = 500.0 / 360.0
 
     routes = [
-        ("#/goals", "目标列表"),
-        ("#/goal/new/goal", "创建目标"),
-        ("#/goal/demo-current-clip/goal", "目标"),
-        ("#/goal/demo-current-clip/result", "结果"),
-        ("#/goal/demo-current-clip/facts", "事实"),
-        ("#/goal/demo-current-clip/causes", "原因与改进"),
-        ("#/goal/demo-current-clip/compare", "对比"),
-        ("#/goal/demo-current-clip/export", "导出"),
-        # 上一个目标的数据，用来压对比面板
-        ("#/goal/demo-prev-template/goal", "目标(旧目标)"),
-        ("#/goal/demo-prev-template/compare", "对比(旧目标)"),
+        ("#/goals", "目标页"),
+        ("#/review/new", "复盘页(新建)"),
+        ("#/review/demo-current-clip", "复盘页(四块)"),
+        ("#/stats", "统计页"),
+        # 旧目标的数据，用来压复盘页与对比面板
+        ("#/review/demo-prev-template", "复盘页(旧目标)"),
     ]
     print("\n[布局] 模拟 360px 手机视口 (zoom=%.2f)" % ZOOM)
     for hash_, label in routes:
@@ -122,13 +121,13 @@ def run(d):
                   "bottom=%s winH=%s" % (r.get("tabbarBottom"), r["winH"]))
             check("%s 内容不被 Tab 栏遮挡" % label, r["contentClear"],
                   "bodyPad=%s tabH=%s" % (r.get("bodyPad"), r.get("tabbarH")))
-            check("%s Tab 栏可横向滚动" % label, r["tabScrollable"],
+            check("%s 三个页签都在视口内" % label, r.get("tabAllVisible") and r.get("tabCount") == 3,
                   "count=%s" % r.get("tabCount"))
 
     # 补录验证弹层
     print("\n[布局] 补录验证弹层")
-    d.execute("location.hash = '#/goal/demo-current-clip/causes'; return true;")
-    time.sleep(0.5)
+    d.execute("location.hash = '#/review/demo-current-clip'; return true;")
+    time.sleep(0.6)
     d.execute("document.querySelector('[data-act=act-close]').click(); return true;")
     time.sleep(0.6)
     r = d.execute("""
@@ -144,6 +143,26 @@ def run(d):
     check("补录验证弹层纵向不超出视口", r["bottom"] <= r["winH"] + 2, str(r))
     check("补录验证弹层内容可滚动", r["scrollable"] or r["h"] <= r["winH"], str(r))
 
+    # 导出弹层
+    print("\n[布局] 导出弹层")
+    d.execute("location.hash = '#/review/demo-current-clip'; return true;")
+    time.sleep(0.5)
+    d.execute("document.querySelector('[data-act=open-export]').click(); return true;")
+    time.sleep(0.6)
+    r = d.execute("""
+      var m = document.querySelector('.modal');
+      if (!m) return {no: true};
+      var r = m.getBoundingClientRect();
+      return {w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top),
+              bottom: Math.round(r.bottom), winH: window.innerHeight, winW: window.innerWidth,
+              scrollable: m.scrollHeight > m.clientHeight};
+    """)
+    check("导出弹层已渲染", not r.get("no"), str(r))
+    check("导出弹层宽度不溢出", r["w"] <= r["winW"], str(r))
+    check("导出弹层纵向不超出视口", r["bottom"] <= r["winH"] + 2, str(r))
+    check("导出弹层内容可滚动", r["scrollable"] or r["h"] <= r["winH"], str(r))
+    d.execute("var m=document.getElementById('modal-root'); if(m) m.innerHTML=''; return true;")
+
     # 文本对比度抽样
     print("\n[可读性]")
     contrast = d.execute("""
@@ -153,13 +172,30 @@ def run(d):
         return 0.2126*f[0]+0.7152*f[1]+0.0722*f[2];
       }
       function parseBg(el){
-        var e = el;
+        // 半透明背景要按层叠合成到不透明底色，否则对比度算不准
+        var stack = [], e = el;
         while (e && e !== document.documentElement){
           var bg = getComputedStyle(e).backgroundColor;
-          if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+          if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent'){
+            var m = bg.match(/[\d.]+/g);
+            if (m){
+              var a = m.length > 3 ? parseFloat(m[3]) : 1;
+              if (a > 0){
+                stack.push({c:[parseFloat(m[0]),parseFloat(m[1]),parseFloat(m[2])], a:a});
+                if (a >= 1) break;
+              }
+            }
+          }
           e = e.parentElement;
         }
-        return 'rgb(14,17,22)';
+        var out = [14,17,22];
+        for (var i = stack.length-1; i >= 0; i--){
+          var st = stack[i];
+          out = [out[0]*(1-st.a)+st.c[0]*st.a,
+                 out[1]*(1-st.a)+st.c[1]*st.a,
+                 out[2]*(1-st.a)+st.c[2]*st.a];
+        }
+        return 'rgb(' + Math.round(out[0])+', '+Math.round(out[1])+', '+Math.round(out[2])+')';
       }
       var bad = [];
       var els = document.querySelectorAll('.modal-sub, .muted, .kv, .item-t, .badge, .btn, h1,h2,h3, p, li, span');

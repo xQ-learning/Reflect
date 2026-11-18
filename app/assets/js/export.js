@@ -213,6 +213,24 @@
     return L.join('\n');
   }
 
+  // 全部目标的合集报告
+  function buildAllMarkdown(goals) {
+    var list = goals || [];
+    if (!list.length) return '';
+    var L = [];
+    L.push('# Reflect 复盘合集');
+    L.push('');
+    L.push('共 ' + list.length + ' 个目标。');
+    L.push('');
+    for (var i = 0; i < list.length; i++) {
+      L.push(buildMarkdown(list[i], list));
+      L.push('');
+      L.push('---');
+      L.push('');
+    }
+    return L.join('\n');
+  }
+
   // 简短摘要：目标一句话 + 差距 + 关键原因 + 首要改进 + 状态
   function buildSummary(goal) {
     if (!goal) return '';
@@ -250,6 +268,7 @@
 
   R.export = {
     buildMarkdown: buildMarkdown,
+    buildAllMarkdown: buildAllMarkdown,
     buildSummary: buildSummary,
     fmtTime: fmtTime,
     esc: esc,

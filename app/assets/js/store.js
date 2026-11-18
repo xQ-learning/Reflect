@@ -63,7 +63,8 @@
       actions: [],
       linkedGoalIds: isArr(gr.linkedGoalIds) ? gr.linkedGoalIds.map(str) : [],
       createdAt: Number(gr.createdAt) || now(),
-      updatedAt: Number(gr.updatedAt) || now()
+      updatedAt: Number(gr.updatedAt) || now(),
+      submittedAt: Number(gr.submittedAt) || 0
     };
 
     if (isArr(gr.results)) {
@@ -226,6 +227,15 @@
     if (patch.criteria !== undefined) g.goal.criteria = normCriteria(patch.criteria);
     persist(id);
     return g;
+  }
+
+  // 提交复盘：给这次复盘打点，之后它算「已提交」
+  function submitGoal(id) {
+    var g = findGoal(id);
+    if (!g) return { ok: false, error: '目标不存在' };
+    g.submittedAt = now();
+    persist(id);
+    return { ok: true, goal: g };
   }
 
   function deleteGoal(id) {
@@ -670,6 +680,7 @@
     getGoal: getGoal,
     createGoal: createGoal,
     updateGoal: updateGoal,
+    submitGoal: submitGoal,
     deleteGoal: deleteGoal,
     validateCriteria: validateCriteria,
     // 结果
