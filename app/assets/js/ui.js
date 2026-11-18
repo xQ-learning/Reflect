@@ -235,7 +235,7 @@
     if (!bar) return;
 
     var logo =
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#4d8dfa" stroke-width="1.8" stroke-linecap="round">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#d4af37" stroke-width="1.8" stroke-linecap="round">' +
       '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>';
 
     var title = 'Reflect';
@@ -446,7 +446,7 @@
       '<textarea id="r-gap" data-act="r-gap" placeholder="例：完成率差 20 个百分点">' +
       esc(resultDraft.gap) + '</textarea></label>' +
       '<div id="r-metrics"></div>' +
-      '<button class="btn sm" data-act="add-metric" style="margin-bottom:10px">+ 添加关键指标</button>' +
+      '<button class="btn sm gold" data-act="add-metric" style="margin-bottom:10px">＋ 添加关键指标</button>' +
       '<button class="btn primary block" data-act="add-result">提交结果</button>';
 
     if (!goal.results.length) {
@@ -602,7 +602,7 @@
         '</span></div>';
     } else {
       h += '<div class="reply" data-act="edit-cause" data-fact="' + esc(f.id) + '">' +
-        (cause ? '🔍 原因：' + esc(cause.text)
+        (cause ? '<b>🔍 原因：</b>' + esc(cause.text)
                : '<span class="ghost">💬 点击这里补充原因...</span>') + '</div>';
     }
 
@@ -616,11 +616,14 @@
         '</span></div>';
     } else {
       h += '<div class="reply" data-act="edit-action" data-fact="' + esc(f.id) + '">' +
-        (action ? '🔧 装备：' + esc(action.title)
+        (action ? '<b>🔧 装备：</b>' + esc(action.title)
                 : '<span class="ghost">🛠️ 点击这里锻造新装备...</span>') + '</div>';
       if (action) {
-        h += '<div class="reply"><span class="st-chip" data-act="toggle-status" data-id="' + esc(action.id) +
-          '">[状态: ' + actionStatusText(action) + ']</span></div>';
+        var stCls = action.status === 'verified' ? 'verified'
+                   : action.status === 'failed' ? 'failed' : 'pending';
+        var stTxt = action.status === 'verified' ? '✓ 已闭环' : actionStatusText(action);
+        h += '<div class="reply"><span class="st-chip ' + stCls + '" data-act="toggle-status" data-id="' +
+          esc(action.id) + '">[' + stTxt + ']</span></div>';
       }
     }
     h += '</div>';
