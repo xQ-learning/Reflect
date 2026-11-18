@@ -563,7 +563,12 @@ table.tbl th { color: var(--muted); font-weight: 500; background: var(--bg-soft)
   font-weight: 500;
   cursor: pointer;
 }
-.bar-back { font-size: 22px; color: var(--muted); }
+/* 返回和编辑保持同一种样式：同样的字号、颜色和点击感 */
+.bar-back, .bar-link {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
 .bar-back:hover, .bar-link:hover { color: var(--accent); }
 
 /* ---------- 复盘页：四块 ---------- */

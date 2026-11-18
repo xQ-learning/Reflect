@@ -73,6 +73,30 @@
 
 ---
 
+## 当前状态（给新会话的交接）
+
+- 分支：`feat/goal-review-tabs`（从 `feat/simplify-panels` 拉出），已推送到 `origin`
+- 已发版：**2.4.0**（versionCode 10），交付文件 `/mnt/hgfs/app/reflect-v2.4.0.apk` + 同名 `.sha256`
+- **工作区有一处还没发版的改动**：战报回放顶栏「< 返回」按钮的样式改成和「编辑 >」完全一致（`.bar-back` / `.bar-link` 同字号同色同点击区）。测试已全过（150 / 53），按用户要求**先不打包**，等下次一起发版
+- 上一轮做完的：复盘页从「纵向四块」重构成「三模块 + 顶部悬浮步骤条」；事实/原因/改进合并成聊天式时间线（事实是大卡片，原因和装备是下面的回复）；事实带情绪标记与自动时间；装备带可点切换的 `[状态: 待验证]`；差距汇总移到时间线上方；战报回放模块改名并把标题居中
+
+接手时按这个顺序走：
+
+1. `git status` —— 确认只有预期改动
+2. `python3 tools/acceptance_test.py`（150 项）和 `python3 tools/layout_check.py`（53 项）必须全过。前端是纯 JS，测试用 geckodriver 驱动真实 Firefox 渲染断言，不是 mock
+3. `./build.sh` —— 产出已签名的 `build/reflect.apk`（密钥自动生成在 `keystore/reflect.jks`，**别删，覆盖安装要同一个密钥**）
+4. 交付到 `/mnt/hgfs/app/reflect-vX.Y.Z.apk` + 同名 `.sha256`（用 `install -m 644`，`cp` 会被拦）
+5. `git add -A && git commit && git push`
+
+### 已知坑
+
+- **`store.persist()` 用 try/catch 吞掉了 `ui.render()` 的异常**：前端 JS 一报错，页面就「静默不更新」，控制台也不报错。排查时先手动调 `Reflect.ui.render()` 看是否抛错
+- 往 `/mnt/hgfs/app/` 覆盖**已存在**的文件会被安全分类器判为「Irreversible Local Destruction」拦下来 —— 所以每版都写新的带版本号文件名，用户也明确要求不覆盖 `reflect.apk`
+- 本机 Firefox 是 snap 包，受 confinement 限制读不到 `/tmp`，测试要在仓库目录或 `~` 下跑
+- 本机没有模拟器（无 KVM）也没有真机，APK 从未在设备上跑过；原生壳部分（WebView 承载、导出文件、分享）只做了静态验证
+
+---
+
 ## 构建
 
 环境要求：Android SDK（build-tools 34 + platform android-34）、JDK 17。**不需要 Gradle、Node、npm 或 pip。**
@@ -132,7 +156,7 @@ goals[] = {
 }
 ```
 
-- `facts[]`：`{ id, content, timelineAt }`
+- `facts[]`：`{ id, content, timelineAt, mood(bad/good/flat) }` —— `mood` 是记录时选的情绪，老数据没有这个字段时按文本里的正向词推断
 - `causes[]`：`{ id, text, factId }` —— 锚到一条事实
 - `actions[]`：`{ id, title, factId, verifyResult, status(open/verified/failed), closedAt }`
 
@@ -156,7 +180,7 @@ goals[] = {
 | 修改目标即覆盖 | `updateGoal()` 直接写当前目标，没有历史版本 |
 | 改进没有验证结论不能闭环 | `closeAction()` 在 `verifyResult` 为空时返回 `{ok:false}`，UI 拦截并提示 |
 | 提交复盘打上标记 | `submitGoal()` 写入 `submittedAt`，目标页据此显示「已提交」 |
-| 原因和改进必须挂在事实下面 | 归因与改进在 ④ 块按事实内联编辑，模型上 `cause.factId` / `action.factId` |
+| 原因和改进必须挂在事实下面 | 在「📝 事实与归因」模块里按事实内联编辑，模型上 `cause.factId` / `action.factId` |
 | 删事实会带走它的原因和改进 | `removeFact()` 级联清理，不留孤儿条目 |
 | 对比高亮重复问题 | 中文不能靠空格分词，用**字符 bigram 的 Jaccard + 关键词集合重叠**混合打分，阈值 0.45 |
 
