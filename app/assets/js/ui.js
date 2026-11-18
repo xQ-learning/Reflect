@@ -302,13 +302,18 @@
       var st = blockStatus(g);
       var done = doneCount(st);
       var pending = openActions(g);
-      h += '<button class="proj-card" data-act="open-goal" data-id="' + esc(g.id) + '">' +
-        '<div class="row between"><span class="t">' + esc(short(g.goal.description || '未填目标', 28)) + '</span>' +
-        '<span class="badge ' + statusBadge(g)[0] + '">' + statusBadge(g)[1] + '</span></div>' +
+      h += '<div class="proj-card" data-act="open-goal" data-id="' + esc(g.id) + '">' +
+        '<div class="row between"><span class="t">' + esc(short(g.goal.description || '未填目标', 24)) + '</span>' +
+        '<div class="row" style="gap:6px;flex:0 0 auto">' +
+        '<span class="badge ' + statusBadge(g)[0] + '">' + statusBadge(g)[1] + '</span>' +
+        '<button class="iconbtn del" data-act="delete-goal" data-id="' + esc(g.id) + '" aria-label="删除目标">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"></path></svg></button>' +
+        '</div></div>' +
         '<div class="meta">' + g.goal.criteria.length + ' 条验证标准 · ' + done + '/4 块已填 · 更新于 ' + fmtTime(g.updatedAt) + '</div>' +
         '<div class="progress"><i style="width:' + Math.round(done / 4 * 100) + '%"></i></div>' +
         (pending.length ? '<div class="meta" style="color:var(--warn)">' + pending.length + ' 条改进还没验证</div>' : '') +
-        '</button>';
+        '</div>';
     }
     return h;
   }
@@ -425,105 +430,118 @@
     return h;
   }
 
-  // ③ 事实
+  // ③ 事实：只负责「记一条」，时间线搬到 ④ 去
   function renderFactsBody(goal) {
     var h = '';
     h += '<label class="field"><span>发生了什么</span>' +
       '<textarea id="f-content" placeholder="例：用户在模板入口停留超过 40 秒后退出"></textarea></label>' +
       '<label class="field"><span>时间点</span><input type="text" id="f-time" value="' + esc(nowLocalInput()) + '" placeholder="2026-11-16 14:30"></label>' +
       '<button class="btn primary block" data-act="add-fact">记下来</button>';
+    if (goal.facts.length) {
+      h += '<div class="muted small" style="margin-top:10px">已记 ' + goal.facts.length +
+        ' 条，去下面的「原因与改进」里归因。</div>';
+    }
+    return h;
+  }
+
+  // ④ 原因与改进：事实时间线，每条事实下面挂它的原因和改进
+  function causeOfFact(goal, factId) {
+    for (var i = 0; i < goal.causes.length; i++) {
+      if (goal.causes[i].factId === factId) return goal.causes[i];
+    }
+    return null;
+  }
+
+  function actionOfFact(goal, factId) {
+    for (var i = 0; i < goal.actions.length; i++) {
+      if (goal.actions[i].factId === factId) return goal.actions[i];
+    }
+    return null;
+  }
+
+  function factText(f) {
+    if (!f) return '（事实已删除）';
+    return (f.timelineAt ? f.timelineAt + ' · ' : '') + f.content;
+  }
+
+  function actionItemHtml(ac) {
+    var stTxt = ac.status === 'verified' ? '已闭环' : ac.status === 'failed' ? '未生效' : '待验证';
+    var h = '<div class="row between" style="margin-top:8px"><span class="muted small">改进状态</span>' +
+      '<span class="badge ' + esc(ac.status) + '">' + stTxt + '</span></div>';
+    if (ac.verifyResult) {
+      h += '<div class="kv"><b>验证结论：</b>' + esc(ac.verifyResult) + '</div>' +
+        '<div class="muted small">' + fmtTime(ac.closedAt) + ' 闭环</div>';
+    } else {
+      h += '<div class="row" style="gap:6px;margin-top:6px">' +
+        '<button class="btn sm ok" data-act="act-close" data-id="' + esc(ac.id) + '">补录验证</button>' +
+        '<button class="btn sm warn" data-act="act-failed" data-id="' + esc(ac.id) + '">未生效</button>' +
+        '</div>';
+    }
+    return h;
+  }
+
+  function renderCausesBody(goal) {
+    var h = '';
+    h += '<div class="hint">在每条事实下面写它的原因和改进。改进的验证可以留到以后补——它常常要等一个周期，甚至在别的目标里才闭环。</div>';
 
     var facts = goal.facts.slice().sort(function (a, b) {
       return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
     });
 
     if (!facts.length) {
-      h += '<div class="muted small" style="margin-top:12px">还没有事实。</div>';
+      h += '<div class="muted small" style="margin-top:12px">还没有事实。先在上面记一条，才能归因和改进。</div>';
       return h;
     }
 
-    h += '<hr class="sep"><div class="muted small">时间线（' + facts.length + '）</div>';
-    h += '<div class="timeline" style="margin-top:8px">';
-    for (var t = 0; t < facts.length; t++) {
-      var tf = facts[t];
+    h += '<div class="timeline" style="margin-top:12px">';
+    for (var i = 0; i < facts.length; i++) {
+      var f = facts[i];
+      var cause = causeOfFact(goal, f.id);
+      var action = actionOfFact(goal, f.id);
       h += '<div class="tl-item">' +
-        '<div class="tl-time">' + esc(tf.timelineAt || '未标时间') + '</div>' +
+        '<div class="tl-time">' + esc(f.timelineAt || '未标时间') + '</div>' +
         '<div class="tl-body">' +
-        '<div style="white-space:pre-wrap">' + esc(tf.content) + '</div>' +
-        '<div class="row end" style="margin-top:8px">' +
-        '<button class="btn sm ghost" data-act="del-fact" data-id="' + esc(tf.id) + '">删除</button></div>' +
+        '<div class="fact-txt">' + esc(f.content) + '</div>' +
+        '<div class="fact-ln"><span class="fl-h">原因</span>' +
+        '<div class="crit-row"><input type="text" class="cause-in" data-fact="' + esc(f.id) +
+        '" value="' + esc(cause ? cause.text : '') + '" placeholder="例：模板入口太多，新手卡住了">' +
+        '<button class="btn sm ghost" data-act="save-cause" data-fact="' + esc(f.id) + '">存</button></div></div>' +
+        '<div class="fact-ln"><span class="fl-h">改进</span>' +
+        '<div class="crit-row"><input type="text" class="action-in" data-fact="' + esc(f.id) +
+        '" value="' + esc(action ? action.title : '') + '" placeholder="例：默认推荐一个模板">' +
+        '<button class="btn sm ghost" data-act="save-action" data-fact="' + esc(f.id) + '">存</button></div></div>' +
+        (action ? actionItemHtml(action) : '') +
+        '<div class="row end" style="margin-top:6px">' +
+        '<button class="btn sm ghost" data-act="del-fact" data-id="' + esc(f.id) + '">删除事实</button></div>' +
         '</div></div>';
     }
     h += '</div>';
-    return h;
-  }
 
-  // ④ 原因与改进
-  function renderCausesBody(goal) {
-    var h = '';
-
-    h += '<div class="hint">写下原因，并关联到具体事实。</div>' +
-      '<label class="field" style="margin-top:10px"><span>原因</span>' +
-      '<textarea id="c-text" placeholder="例：模板入口过多导致新手在选择模板时卡住"></textarea></label>' +
-      '<div class="muted small">关联事实（可多选）</div><div id="c-facts" class="opts" style="margin-top:6px"></div>' +
-      '<button class="btn primary block" data-act="add-cause" style="margin-top:10px">添加原因</button>';
-
-    if (!goal.causes.length) {
-      h += '<div class="muted small" style="margin-top:12px">还没有归因。从事实出发判断原因。</div>';
-    } else {
-      h += '<hr class="sep">';
-      for (var i = 0; i < goal.causes.length; i++) {
-        var c = goal.causes[i];
-        h += '<div class="item">' +
-          '<div class="row between"><span class="muted small">' + fmtTime(c.createdAt) + '</span></div>' +
-          '<div class="kv" style="font-size:14px;color:var(--text)">' + esc(c.text) + '</div>';
-        if (c.factIds && c.factIds.length) {
-          h += '<div class="muted small" style="margin-top:6px">关联事实：</div>';
-          for (var fi = 0; fi < c.factIds.length; fi++) {
-            var fid = c.factIds[fi];
-            var ft = null;
-            for (var q = 0; q < goal.facts.length; q++) {
-              if (goal.facts[q].id === fid) ft = goal.facts[q];
-            }
-            if (ft) h += '<div class="kv">· ' + esc(ft.content) + '</div>';
-          }
-        }
-        h += '<div class="row end" style="margin-top:8px">' +
-          '<button class="btn sm ghost" data-act="del-cause" data-id="' + esc(c.id) + '">删除</button></div>' +
-          '</div>';
+    // 历史数据：没有锚到事实上的原因/改进，只读列出，可删
+    var orphanCauses = goal.causes.filter(function (c) { return !c.factId || !factById(goal, c.factId); });
+    var orphanActions = goal.actions.filter(function (a) { return !a.factId || !factById(goal, a.factId); });
+    if (orphanCauses.length || orphanActions.length) {
+      h += '<hr class="sep"><div class="sub-card"><div class="muted small">历史数据：没有对应事实的条目</div>';
+      for (var oc = 0; oc < orphanCauses.length; oc++) {
+        h += '<div class="row between" style="margin-top:6px">' +
+          '<span class="kv" style="color:var(--text)">原因 · ' + esc(orphanCauses[oc].text) + '</span>' +
+          '<button class="btn sm ghost" data-act="del-cause" data-id="' + esc(orphanCauses[oc].id) + '">删</button></div>';
       }
-    }
-
-    h += '<hr class="sep">';
-    h += '<div class="hint">写下要做的事就行。验证可以留到以后补——它常常要等一个周期，甚至在别的目标里才闭环。</div>' +
-      '<label class="field" style="margin-top:10px"><span>改进措施</span>' +
-      '<input type="text" id="a-title" placeholder="例：优化模板入口，默认推荐一个模板"></label>' +
-      '<button class="btn primary block" data-act="add-action">记下来</button>';
-
-    if (!goal.actions.length) {
-      h += '<div class="muted small" style="margin-top:12px">还没有改进措施。每个原因都该落到一条具体要做的事上。</div>';
-      return h;
-    }
-
-    h += '<hr class="sep">';
-    for (var a = 0; a < goal.actions.length; a++) {
-      var ac = goal.actions[a];
-      var stTxt = ac.status === 'verified' ? '已闭环' : ac.status === 'failed' ? '未生效' : '待验证';
-      h += '<div class="item">' +
-        '<div class="row between"><span class="item-t grow">' + esc(ac.title) + '</span>' +
-        '<span class="badge ' + esc(ac.status) + '">' + stTxt + '</span></div>';
-      if (ac.verifyResult) {
-        h += '<div class="kv"><b>验证结论：</b>' + esc(ac.verifyResult) + '</div>' +
-          '<div class="muted small">' + fmtTime(ac.closedAt) + ' 闭环</div>';
-      } else {
-        h += '<div class="row" style="margin-top:8px">' +
-          '<button class="btn sm ok" data-act="act-close" data-id="' + esc(ac.id) + '">补录验证</button>' +
-          '<button class="btn sm warn" data-act="act-failed" data-id="' + esc(ac.id) + '">未生效</button>' +
-          '</div>';
+      for (var oa = 0; oa < orphanActions.length; oa++) {
+        h += '<div class="row between" style="margin-top:6px">' +
+          '<span class="kv" style="color:var(--text)">改进 · ' + esc(orphanActions[oa].title) + '</span>' +
+          '<button class="btn sm ghost" data-act="del-action" data-id="' + esc(orphanActions[oa].id) + '">删</button></div>';
       }
       h += '</div>';
     }
     return h;
+  }
+
+  function factById(goal, id) {
+    for (var i = 0; i < goal.facts.length; i++) {
+      if (goal.facts[i].id === id) return goal.facts[i];
+    }
+    return null;
   }
 
   // 空目标：复盘页起始时四块都在，只是还没有内容
@@ -604,9 +622,11 @@
     if (cmp.ineffectiveActions.length) {
       for (var ic = 0; ic < cmp.ineffectiveActions.length; ic++) {
         var ia = cmp.ineffectiveActions[ic];
+        var af = ia.action.factId ? factById(other, ia.action.factId) : null;
         h += '<div class="item highlight" style="margin-top:8px">' +
           '<div class="hl-tag">未闭环改进 · ' + (ia.failed ? '未生效' : '待验证') + '</div>' +
           '<div class="kv">' + esc(ia.action.title) + '</div>' +
+          (af ? '<div class="kv">来自事实：' + esc(factText(af)) + '</div>' : '') +
           (ia.action.verifyResult ? '<div class="kv">验证结论：' + esc(ia.action.verifyResult) + '</div>' : '') +
           '</div>';
       }
@@ -710,7 +730,6 @@
     view.innerHTML = renderReview(g);
     renderTabbar();
     if (pendingMetrics.length) renderPendingMetrics();
-    setTimeout(renderCauseFactPicker, 0);
   }
 
   function seedGoalForm(g) {
@@ -905,6 +924,16 @@
         go('#/review/' + id);
         return;
       }
+      if (actEl === 'delete-goal') {
+        var dg = store.getGoal(id);
+        var dname = dg ? short(dg.goal.description || '未填目标', 16) : '';
+        confirmBox('删除《' + dname + '》？它的结果、事实、原因和改进都会一起删掉，撤不回来。', function () {
+          store.deleteGoal(id);
+          notify('目标已删除', 'ok');
+          render();
+        });
+        return;
+      }
       if (actEl === 'submit-review') {
         var sub = store.submitGoal(route.id);
         if (!sub.ok) { toast(sub.error, 'err'); return; }
@@ -1018,19 +1047,31 @@
         return;
       }
 
-      // --- 原因 ---
-      if (actEl === 'add-cause') {
-        var ctext = ($('c-text') || {}).value || '';
-        if (!ctext.trim()) { toast('请写下原因', 'err'); return; }
-        var chosen = [];
-        var boxes = document.querySelectorAll('#c-facts input[type=checkbox]');
-        for (var bi = 0; bi < boxes.length; bi++) {
-          if (boxes[bi].checked) chosen.push(boxes[bi].getAttribute('data-fid'));
-        }
+      // --- 原因：写在事实下面 ---
+      if (actEl === 'save-cause') {
+        var factId = el.getAttribute('data-fact') || '';
+        var cInput = document.querySelector('.cause-in[data-fact="' + factId + '"]');
+        var ctext = (cInput ? cInput.value : '') || '';
         var cg = ensureGoal();
         if (!cg) return;
-        store.addCause(cg.id, { text: ctext.trim(), factIds: chosen });
-        notify('原因已添加', 'ok');
+        var oldCause = causeOfFact(cg, factId);
+        if (!ctext.trim()) {
+          if (oldCause) {
+            store.removeCause(cg.id, oldCause.id);
+            notify('原因已清除', 'ok');
+          } else {
+            toast('还没写原因', 'err');
+          }
+          render();
+          return;
+        }
+        if (oldCause) {
+          store.updateCause(cg.id, oldCause.id, { text: ctext.trim() });
+          notify('原因已更新', 'ok');
+        } else {
+          store.addCause(cg.id, { text: ctext.trim(), factId: factId });
+          notify('原因已记下', 'ok');
+        }
         render();
         return;
       }
@@ -1043,15 +1084,42 @@
         return;
       }
 
-      // --- 改进 ---
-      if (actEl === 'add-action') {
-        var atitle = ($('a-title') || {}).value || '';
-        if (!atitle.trim()) { toast('请写下要做的事', 'err'); return; }
+      // --- 改进：写在事实下面 ---
+      if (actEl === 'save-action') {
+        var afactId = el.getAttribute('data-fact') || '';
+        var aInput = document.querySelector('.action-in[data-fact="' + afactId + '"]');
+        var atitle = (aInput ? aInput.value : '') || '';
         var ag = ensureGoal();
         if (!ag) return;
-        store.addAction(ag.id, { title: atitle.trim() });
-        notify('改进措施已记下', 'ok');
+        var oldAction = actionOfFact(ag, afactId);
+        if (!atitle.trim()) {
+          if (oldAction) {
+            confirmBox('确定删掉这条改进？', function () {
+              store.removeAction(oldAction.id);
+              notify('改进已删除', 'ok');
+              render();
+            });
+          } else {
+            toast('还没写改进', 'err');
+          }
+          return;
+        }
+        if (oldAction) {
+          store.updateAction(oldAction.id, { title: atitle.trim() });
+          notify('改进已更新', 'ok');
+        } else {
+          store.addAction(ag.id, { title: atitle.trim(), factId: afactId });
+          notify('改进措施已记下', 'ok');
+        }
         render();
+        return;
+      }
+      if (actEl === 'del-action') {
+        confirmBox('确定删掉这条改进？', function () {
+          store.removeAction(id);
+          notify('改进已删除', 'ok');
+          render();
+        });
         return;
       }
       if (actEl === 'act-close' || actEl === 'act-failed') {
@@ -1132,26 +1200,6 @@
     });
 
     global.addEventListener('hashchange', function () { render(); });
-  }
-
-  // 渲染归因面板里的"关联事实"复选框
-  function renderCauseFactPicker() {
-    var host = $('c-facts');
-    if (!host) return;
-    var g = route.id === 'new' ? null : store.getGoal(route.id);
-    if (!g) { host.innerHTML = '<div class="muted small">暂无事实</div>'; return; }
-    var facts = g.facts.slice().sort(function (a, b) {
-      return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
-    });
-    if (!facts.length) { host.innerHTML = '<div class="muted small">暂无事实</div>'; return; }
-    var h = '';
-    for (var i = 0; i < facts.length; i++) {
-      h += '<label class="opt" style="display:inline-flex;align-items:center;gap:6px;min-height:44px">' +
-        '<input type="checkbox" class="sel-box" data-fid="' + esc(facts[i].id) + '">' +
-        esc(String(facts[i].timelineAt || '').slice(5) + ' ' + facts[i].content.slice(0, 16)) +
-        '</label>';
-    }
-    host.innerHTML = h;
   }
 
   function start() {

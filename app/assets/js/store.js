@@ -104,10 +104,15 @@
     if (isArr(gr.causes)) {
       for (var k = 0; k < gr.causes.length; k++) {
         var cs = gr.causes[k] || {};
+        var fid = str(cs.factId);
+        // 老数据是 factIds 数组：取第一条
+        if (!fid && isArr(cs.factIds) && cs.factIds.length) fid = str(cs.factIds[0]);
+        // 再兜不住就挂到该目标的第一条事实上，别丢
+        if (!fid && rec.facts.length) fid = rec.facts[0].id;
         rec.causes.push({
           id: str(cs.id) || uid('c'),
           text: str(cs.text),
-          factIds: isArr(cs.factIds) ? cs.factIds.map(str) : [],
+          factId: fid,
           createdAt: Number(cs.createdAt) || now()
         });
       }
@@ -119,6 +124,7 @@
         rec.actions.push({
           id: str(ac.id) || uid('a'),
           title: str(ac.title),
+          factId: str(ac.factId),
           verifyResult: str(ac.verifyResult),
           status: ACTION_STATUS.indexOf(ac.status) >= 0 ? ac.status : 'open',
           closedAt: ac.closedAt ? Number(ac.closedAt) : null,
@@ -340,6 +346,9 @@
     for (var i = 0; i < g.facts.length; i++) {
       if (g.facts[i].id === factId) {
         g.facts.splice(i, 1);
+        // 挂在它下面的原因和改进一起走，不然就成了没事实的孤儿
+        g.causes = g.causes.filter(function (c) { return c.factId !== factId; });
+        g.actions = g.actions.filter(function (a) { return a.factId !== factId; });
         persist(goalId);
         return true;
       }
@@ -352,10 +361,12 @@
     var g = findGoal(goalId);
     if (!g) return null;
     data = data || {};
+    var fid = str(data.factId);
+    if (!fid && isArr(data.factIds) && data.factIds.length) fid = str(data.factIds[0]);
     var c = {
       id: uid('c'),
       text: str(data.text),
-      factIds: isArr(data.factIds) ? data.factIds.map(str) : [],
+      factId: fid,
       createdAt: now()
     };
     g.causes.push(c);
@@ -371,9 +382,7 @@
       var c = g.causes[i];
       if (c.id !== causeId) continue;
       if (patch.text !== undefined) c.text = str(patch.text);
-      if (patch.factIds !== undefined) {
-        c.factIds = isArr(patch.factIds) ? patch.factIds.map(str) : [];
-      }
+      if (patch.factId !== undefined) c.factId = str(patch.factId);
       persist(goalId);
       return c;
     }
@@ -402,6 +411,7 @@
     var a = {
       id: uid('a'),
       title: str(data.title),
+      factId: str(data.factId),
       verifyResult: '',
       status: 'open',
       closedAt: null,
@@ -429,6 +439,7 @@
     var a = hit.action;
     patch = patch || {};
     if (patch.title !== undefined) a.title = str(patch.title);
+    if (patch.factId !== undefined) a.factId = str(patch.factId);
     if (patch.verifyResult !== undefined) a.verifyResult = str(patch.verifyResult);
     if (patch.status !== undefined) {
       var st = patch.status;
@@ -538,23 +549,31 @@
         gap: '耗时超出目标 22 秒',
         createdAt: t - 86400000 * 28
       }],
-      facts: [{
-        id: 'demo-prev-fact',
-        content: '新用户在模板区平均浏览 9 个模板后离开',
-        timelineAt: '2026-10-20 11:00',
-        createdAt: t - 86400000 * 28
-      }],
+      facts: [
+        {
+          id: 'demo-prev-fact',
+          content: '新用户在模板区平均浏览 9 个模板后离开',
+          timelineAt: '2026-10-20 11:00',
+          createdAt: t - 86400000 * 28
+        },
+        {
+          id: 'demo-prev-fact-2',
+          content: '并发导出时素材加载排队，最长等 2 分半',
+          timelineAt: '2026-10-20 11:40',
+          createdAt: t - 86400000 * 28
+        }
+      ],
       causes: [
         {
           id: 'demo-prev-cause-1',
           text: '模板入口过多导致新手在选择模板时卡住',
-          factIds: ['demo-prev-fact'],
+          factId: 'demo-prev-fact',
           createdAt: t - 86400000 * 27
         },
         {
           id: 'demo-prev-cause-2',
           text: '素材加载慢导致导出排队',
-          factIds: [],
+          factId: 'demo-prev-fact-2',
           createdAt: t - 86400000 * 27
         }
       ],
@@ -562,6 +581,7 @@
         {
           id: 'demo-prev-action-1',
           title: '优化模板入口排序',
+          factId: 'demo-prev-fact',
           verifyResult: '',
           status: 'failed',
           closedAt: null,
@@ -570,6 +590,7 @@
         {
           id: 'demo-prev-action-2',
           title: '导出队列限流',
+          factId: 'demo-prev-fact-2',
           verifyResult: '',
           status: 'open',
           closedAt: null,
@@ -630,19 +651,19 @@
         {
           id: 'demo-cur-cause-1',
           text: '模板入口过多导致新手在选择模板时卡住',
-          factIds: ['demo-cur-fact-1'],
+          factId: 'demo-cur-fact-1',
           createdAt: t - 86400000 * 1
         },
         {
           id: 'demo-cur-cause-2',
           text: '素材加载慢导致导出排队',
-          factIds: ['demo-cur-fact-2'],
+          factId: 'demo-cur-fact-2',
           createdAt: t - 86400000 * 1
         },
         {
           id: 'demo-cur-cause-3',
           text: '缺少预设模板，用户不知道从哪一步开始',
-          factIds: ['demo-cur-fact-4'],
+          factId: 'demo-cur-fact-4',
           createdAt: t - 86400000 * 1
         }
       ],
@@ -650,6 +671,7 @@
         {
           id: 'demo-cur-action-1',
           title: '优化模板入口，默认推荐一个模板',
+          factId: 'demo-cur-fact-1',
           verifyResult: '',
           status: 'open',
           closedAt: null,
@@ -658,6 +680,7 @@
         {
           id: 'demo-cur-action-2',
           title: '导出流程增加断点保存',
+          factId: 'demo-cur-fact-2',
           verifyResult: '',
           status: 'open',
           closedAt: null,

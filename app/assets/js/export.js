@@ -28,6 +28,17 @@
     return v.trim() ? v : '—';
   }
 
+  // 事实的展示文案：时间点 + 内容
+  function factLabel(factId, facts) {
+    if (!factId) return '';
+    for (var i = 0; i < facts.length; i++) {
+      if (facts[i].id === factId) {
+        return (facts[i].timelineAt ? facts[i].timelineAt + ' · ' : '') + facts[i].content;
+      }
+    }
+    return '';
+  }
+
   function goalById(allGoals, id) {
     if (!allGoals || !allGoals.length) return null;
     for (var i = 0; i < allGoals.length; i++) {
@@ -114,15 +125,11 @@
       L.push('（尚未归因）');
       L.push('');
     } else {
-      L.push('| 原因 | 关联事实 |');
+      L.push('| 原因 | 对应事实 |');
       L.push('| --- | --- |');
       for (var cs = 0; cs < causes.length; cs++) {
         var cause = causes[cs];
-        var linked = (cause.factIds || []).map(function (id) {
-          for (var k = 0; k < facts.length; k++) { if (facts[k].id === id) return facts[k].content; }
-          return '';
-        }).filter(Boolean).join('；');
-        L.push('| ' + cell(cause.text) + ' | ' + cell(linked) + ' |');
+        L.push('| ' + cell(cause.text) + ' | ' + cell(factLabel(cause.factId, facts)) + ' |');
       }
       L.push('');
     }
@@ -135,15 +142,16 @@
       L.push('（尚未制定改进）');
       L.push('');
     } else {
-      L.push('| 改进措施 | 状态 | 验证结论 |');
-      L.push('| --- | --- | --- |');
+      L.push('| 改进措施 | 对应事实 | 状态 | 验证结论 |');
+      L.push('| --- | --- | --- | --- |');
       for (var a = 0; a < actions.length; a++) {
         var ac = actions[a];
         var statusText = ACTION_STATE_CN[ac.status] || ac.status;
         if (ac.status === 'open') statusText += '（**尚未闭环**）';
         var resText = ac.verifyResult ? ac.verifyResult : '（未填写）';
         if (ac.status === 'open') resText += '　——　**尚未闭环**';
-        L.push('| ' + cell(ac.title) + ' | ' + statusText + ' | ' + cell(resText) + ' |');
+        L.push('| ' + cell(ac.title) + ' | ' + cell(factLabel(ac.factId, facts)) + ' | '
+          + statusText + ' | ' + cell(resText) + ' |');
       }
       L.push('');
       var open = actions.filter(function (x) { return x.status !== 'verified'; });
