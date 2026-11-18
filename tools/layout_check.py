@@ -50,9 +50,11 @@ PROBE = """
                        ' sw=' + e.scrollWidth + ' cw=' + e.clientWidth);
     }
   }
-  // 底部 tab 栏：项目列表页没有 tab 栏（只有进入项目后才有），此时跳过
+  // 底部 tab 栏：审阅页会把它藏掉并铺满整屏
   var tb = document.getElementById('tabbar');
-  out.hasTabbar = !!(tb && tb.children.length);
+  out.tabHidden = !!(tb && getComputedStyle(tb).display === 'none');
+  out.bodyPad = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+  out.hasTabbar = !!(tb && tb.children.length && !out.tabHidden);
   if (out.hasTabbar) {
     var r = tb.getBoundingClientRect();
     out.tabbarBottom = Math.round(r.bottom / Z); out.tabbarH = Math.round(r.height / Z);
@@ -103,16 +105,16 @@ def run(d):
     ZOOM = 500.0 / 360.0
 
     routes = [
-        ("#/goals", "目标页"),
-        ("#/review/new", "复盘页(新建)"),
-        ("#/review/demo-current-clip", "复盘页(四块)"),
-        ("#/view/demo-current-clip", "审阅页(只读)"),
-        ("#/stats", "统计页"),
+        ("#/goals", "目标页", False),
+        ("#/review/new", "复盘页(新建)", False),
+        ("#/review/demo-current-clip", "复盘页(四块)", False),
+        ("#/view/demo-current-clip", "审阅页(只读)", True),
+        ("#/stats", "统计页", False),
         # 旧目标的数据，用来压复盘页与对比面板
-        ("#/review/demo-prev-template", "复盘页(旧目标)"),
+        ("#/review/demo-prev-template", "复盘页(旧目标)", False),
     ]
     print("\n[布局] 模拟 360px 手机视口 (zoom=%.2f)" % ZOOM)
-    for hash_, label in routes:
+    for hash_, label, noTab in routes:
         d.execute("location.hash = arguments[0]; return true;", [hash_])
         time.sleep(0.4)
         d.execute("document.documentElement.style.zoom = arguments[0]; return true;", [ZOOM])
@@ -123,6 +125,10 @@ def run(d):
         check("%s 无横向溢出" % label, r["overflowX"] <= 1, "溢出 %spx" % r["overflowX"])
         check("%s 触控目标均 >=40px" % label, not r["tiny"], str(r["tiny"][:4]))
         check("%s 无内容裁切" % label, not r["clipped"], str(r["clipped"][:3]))
+        if noTab:
+            check("%s 底部导航栏被内容覆盖" % label, r.get("tabHidden"), str(r.get("tabHidden")))
+            check("%s 内容铺满到底" % label, r.get("bodyPad", 99) <= 1,
+                  "bodyPad=%s" % r.get("bodyPad"))
         if r.get("hasTabbar"):
             check("%s 底部 Tab 栏完整可见" % label, r["tabbarVisible"],
                   "bottom=%s winH=%s" % (r.get("tabbarBottom"), r["winH"]))

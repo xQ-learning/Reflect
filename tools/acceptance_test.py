@@ -112,10 +112,13 @@ def run(d):
       var v = document.getElementById('view');
       return {labels: labels, hasNew: !!v.querySelector('[data-act=new-goal]'),
               cards: v.querySelectorAll('[data-act=view-goal]').length,
+              hasSeed: !!v.querySelector('[data-act=seed]'),
               text: v.textContent};
     """)
     check("底部只有三个横向页签", nav["labels"] == ["目标", "复盘", "统计"], str(nav["labels"]))
     check("目标页没有「＋新目标」入口", not nav["hasNew"], str(nav["hasNew"]))
+    check("目标页不再有「载入示例」",
+          not nav.get("hasSeed"), str(nav.get("hasSeed")))
     check("目标页列出过往目标", nav["cards"] >= 2, str(nav["cards"]))
     check("列表里不出现「复盘项目」字样", "复盘项目" not in nav["text"], "")
 
@@ -143,6 +146,13 @@ def run(d):
     check("还没事实时原因与改进块给出提示而不是空白",
           "还没有事实" in fresh.get("tip", ""), str(fresh.get("tip", "")))
     check("目标没建好时不显示提交按钮", not fresh["hasSubmit"], str(fresh["hasSubmit"]))
+    top_seed = d.execute("""
+      var bar = document.getElementById('appbar');
+      return {seed: !!bar.querySelector('[data-act=seed]'),
+              inView: !!document.getElementById('view').querySelector('[data-act=seed]')};
+    """)
+    check("「载入示例」挪到复盘页顶部右侧",
+          top_seed["seed"] and not top_seed["inView"], str(top_seed))
 
     # 点目标页的卡片 → 只读审阅页
     d.execute("location.hash = '#/goals'; return true;")
@@ -179,6 +189,10 @@ def run(d):
                         || !!v.querySelector('[data-act=save-cause]')
                         || !!v.querySelector('[data-act=del-fact]'),
               hasEdit: !!v.querySelector('[data-act=edit-review]'),
+              barEdit: !!document.getElementById('appbar').querySelector('[data-act=edit-review]'),
+              barBack: !!document.getElementById('appbar').querySelector('[data-act=back]'),
+              tabHidden: getComputedStyle(document.getElementById('tabbar')).display === 'none',
+              bodyPad: parseFloat(getComputedStyle(document.body).paddingBottom) || 0,
               text: v.textContent};
     """)
     check("点目标页卡片进入审阅页", opened["hash"].startswith("#/view/"), opened["hash"])
@@ -188,11 +202,15 @@ def run(d):
     check("审阅页带出原因与改进", opened["factRows"] >= 2, str(opened))
     check("审阅页完全只读，没有输入框和写操作",
           not opened["editable"], str(opened))
-    check("审阅页有「编辑」入口", opened["hasEdit"], str(opened))
+    check("审阅页内容里不再有编辑按钮", not opened["hasEdit"], str(opened))
+    check("审阅页顶部有「编辑」和「返回」",
+          opened["barEdit"] and opened["barBack"], str(opened))
+    check("审阅页铺满到底，导航栏不占位",
+          opened["tabHidden"] and opened["bodyPad"] <= 1, str(opened))
 
-    # 点「编辑」→ 进入复盘页
+    # 点顶部「编辑」→ 进入复盘页
     d.execute("""
-      var b = document.querySelector('[data-act=edit-review]');
+      var b = document.getElementById('appbar').querySelector('[data-act=edit-review]');
       if (b) b.click();
       return true;
     """)

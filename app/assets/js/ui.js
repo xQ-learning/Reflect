@@ -242,14 +242,16 @@
       sub = '';
       var vg = store.getGoal(route.id);
       if (vg) {
-        right = '<button class="btn sm" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑</button>';
+        right = '<button class="btn sm" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑</button>' +
+          '<button class="btn sm ghost" data-act="back">返回</button>';
       }
     } else if (route.view === 'review') {
       title = '复盘';
       sub = '';
       var g = route.id === 'new' ? null : store.getGoal(route.id);
+      right = '<button class="btn sm ghost" data-act="seed">载入示例</button>';
       if (g) {
-        right = '<button class="iconbtn" data-act="open-export" aria-label="导出报告">' +
+        right += '<button class="iconbtn" data-act="open-export" aria-label="导出报告">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
           '<path d="M12 3v10m0 0l-4-4m4 4l4-4M4 17v4h16v-4"></path></svg></button>';
       }
@@ -265,7 +267,8 @@
   function renderTabbar() {
     var bar = $('tabbar');
     if (!bar) return;
-    bar.style.display = 'flex';
+    // 审阅页要铺满整屏，底部导航栏不显示
+    bar.style.display = (route.view === 'view') ? 'none' : 'flex';
     var h = '';
     var activeTab = (route.view === 'view') ? 'goals' : route.view;
     for (var i = 0; i < TABS.length; i++) {
@@ -316,8 +319,7 @@
     var goals = store.getGoals().slice().sort(byUpdatedDesc);
     var h = '';
 
-    h += '<div class="card"><div class="row between"><h2 style="margin:0">目标</h2>' +
-      '<button class="btn sm ghost" data-act="seed">载入示例</button></div>' +
+    h += '<div class="card"><h2 style="margin:0">目标</h2>' +
       '<div class="hint">定过的目标都存在这里。点进去看完整复盘，想改点「编辑」。长按目标可以删除。</div>' +
       '</div>';
 
@@ -687,8 +689,7 @@
 
     // 目标
     h += '<div class="card">' +
-      '<div class="row between" style="margin-bottom:10px"><span class="item-t">目标</span>' +
-      '<button class="btn sm" data-act="edit-review" data-id="' + esc(goal.id) + '">编辑</button></div>' +
+      '<div class="row between" style="margin-bottom:10px"><span class="item-t">目标</span></div>' +
       renderGoalViewBody(goal) + '</div>';
 
     // 结果
@@ -722,8 +723,6 @@
     h += '<div class="card"><div class="item-t" style="margin-bottom:8px">事实（' + goal.facts.length + '）</div>' +
       renderTimelineReadonly(goal) + '</div>';
 
-    h += '<button class="btn primary block" data-act="edit-review" data-id="' + esc(goal.id) +
-      '" style="margin-top:16px">编辑这个目标</button>';
     return h;
   }
 
@@ -843,6 +842,11 @@
   // ---------- 渲染 ----------
   function render() {
     route = parseHash();
+    // 审阅页铺满到底：去掉为导航栏预留的底部空白
+    if (document.body) {
+      if (route.view === 'view') document.body.classList.add('no-tabs');
+      else document.body.classList.remove('no-tabs');
+    }
     renderAppbar();
     var view = $('view');
     if (!view) return;

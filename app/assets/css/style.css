@@ -42,6 +42,9 @@ body {
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
 }
 
+/* 审阅页：铺满到底，底部不留导航栏的空白 */
+body.no-tabs { padding-bottom: 0; }
+
 @media (min-width: 900px) {
   body { padding-bottom: 0; }
 }
