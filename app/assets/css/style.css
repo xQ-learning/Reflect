@@ -464,15 +464,27 @@ table.tbl th { color: var(--muted); font-weight: 500; background: var(--bg-soft)
 .fact-ln .crit-row { margin-bottom: 0; }
 .fl-h { color: var(--muted); font-size: 12.5px; }
 
-/* 目标卡片上的删除按钮 */
-.iconbtn.del {
-  min-width: 44px;
-  min-height: 44px;
-  border-color: rgba(224, 92, 92, .4);
-  background: transparent;
-  color: var(--danger);
+/* 存完之后的只读行：和目标块一样，只是文字，不带输入框 */
+.fl-ro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
-.iconbtn.del svg { width: 17px; height: 17px; }
+.fl-ro .grow {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.fl-ro .btn { flex: 0 0 auto; }
+
+/* 长按目标卡片时的按压反馈 */
+.proj-card.pressing {
+  border-color: rgba(224, 92, 92, .5);
+  background: rgba(224, 92, 92, .06);
+}
 
 /* ---------- 复盘页：四块 ---------- */
 .blk-h {

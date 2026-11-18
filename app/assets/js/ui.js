@@ -35,6 +35,8 @@
   var goalForm = { description: '', criteria: [] };
   var goalFormId = null;         // 草稿所属目标 id
   var editingGoal = false;       // 是否处于「修改目标」状态
+  var editCauseFact = null;      // 正在修改「原因」的事实 id
+  var editActionFact = null;     // 正在修改「改进」的事实 id
 
   // ---------- 工具 ----------
   function $(id) { return document.getElementById(id); }
@@ -94,6 +96,22 @@
       '<button class="btn primary" data-act="cf-yes">确定</button>' +
       '</div></div></div>';
     host.__onYes = onOk;
+  }
+
+  // 长按目标卡片弹出的删除菜单（不做二次确认）
+  function openGoalMenu(id) {
+    var host = $('modal-root');
+    if (!host) return;
+    var g = store.getGoal(id);
+    var dname = g ? short(g.goal.description || '未填目标', 16) : '';
+    host.innerHTML =
+      '<div class="modal-mask"><div class="modal" style="max-width:420px">' +
+      '<h3>删除《' + esc(dname) + '》？</h3>' +
+      '<div class="modal-sub">它的结果、事实、原因和改进都会一起删掉，撤不回来。</div>' +
+      '<div class="modal-foot">' +
+      '<button class="btn ghost" data-act="cl-cancel">取消</button>' +
+      '<button class="btn danger" data-act="delete-goal-now" data-id="' + esc(id) + '">删除目标</button>' +
+      '</div></div></div>';
   }
 
   function closeModal() {
@@ -286,7 +304,7 @@
 
     h += '<div class="card"><div class="row between"><h2 style="margin:0">目标</h2>' +
       '<button class="btn sm ghost" data-act="seed">载入示例</button></div>' +
-      '<div class="hint">定过的目标都存在这里，点进去可以继续补录。</div>' +
+      '<div class="hint">定过的目标都存在这里，点进去可以继续补录。长按目标可以删除。</div>' +
       '</div>';
 
     if (!goals.length) {
@@ -303,13 +321,8 @@
       var done = doneCount(st);
       var pending = openActions(g);
       h += '<div class="proj-card" data-act="open-goal" data-id="' + esc(g.id) + '">' +
-        '<div class="row between"><span class="t">' + esc(short(g.goal.description || '未填目标', 24)) + '</span>' +
-        '<div class="row" style="gap:6px;flex:0 0 auto">' +
-        '<span class="badge ' + statusBadge(g)[0] + '">' + statusBadge(g)[1] + '</span>' +
-        '<button class="iconbtn del" data-act="delete-goal" data-id="' + esc(g.id) + '" aria-label="删除目标">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-        '<path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"></path></svg></button>' +
-        '</div></div>' +
+        '<div class="row between"><span class="t">' + esc(short(g.goal.description || '未填目标', 26)) + '</span>' +
+        '<span class="badge ' + statusBadge(g)[0] + '">' + statusBadge(g)[1] + '</span></div>' +
         '<div class="meta">' + g.goal.criteria.length + ' 条验证标准 · ' + done + '/4 块已填 · 更新于 ' + fmtTime(g.updatedAt) + '</div>' +
         '<div class="progress"><i style="width:' + Math.round(done / 4 * 100) + '%"></i></div>' +
         (pending.length ? '<div class="meta" style="color:var(--warn)">' + pending.length + ' 条改进还没验证</div>' : '') +
@@ -464,10 +477,9 @@
     return (f.timelineAt ? f.timelineAt + ' · ' : '') + f.content;
   }
 
+  // 改进条目：只留验证结论与闭环动作，不再显示状态徽章
   function actionItemHtml(ac) {
-    var stTxt = ac.status === 'verified' ? '已闭环' : ac.status === 'failed' ? '未生效' : '待验证';
-    var h = '<div class="row between" style="margin-top:8px"><span class="muted small">改进状态</span>' +
-      '<span class="badge ' + esc(ac.status) + '">' + stTxt + '</span></div>';
+    var h = '';
     if (ac.verifyResult) {
       h += '<div class="kv"><b>验证结论：</b>' + esc(ac.verifyResult) + '</div>' +
         '<div class="muted small">' + fmtTime(ac.closedAt) + ' 闭环</div>';
@@ -480,9 +492,28 @@
     return h;
   }
 
+  // 原因 / 改进这两行：存完是只读（和目标块一样），点「修改」才回到输入框
+  function factLine(label, item, factId, kind) {
+    var editing = (kind === 'cause') ? (editCauseFact === factId) : (editActionFact === factId);
+    var h = '<div class="fact-ln"><span class="fl-h">' + label + '</span>';
+    if (item && !editing) {
+      h += '<div class="fl-ro"><span class="grow">' + esc(item.text || item.title) + '</span>' +
+        '<button class="btn sm ghost" data-act="edit-' + kind + '" data-fact="' + esc(factId) + '">修改</button></div>';
+    } else {
+      var val = item ? (item.text || item.title) : '';
+      var ph = kind === 'cause' ? '例：模板入口太多，新手卡住了' : '例：默认推荐一个模板';
+      h += '<div class="crit-row"><input type="text" class="' + kind + '-in" data-fact="' + esc(factId) +
+        '" value="' + esc(val) + '" placeholder="' + ph + '">' +
+        '<button class="btn sm ghost" data-act="save-' + kind + '" data-fact="' + esc(factId) + '">存</button></div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
   function renderCausesBody(goal) {
     var h = '';
-    h += '<div class="hint">在每条事实下面写它的原因和改进。改进的验证可以留到以后补——它常常要等一个周期，甚至在别的目标里才闭环。</div>';
+    h += '<div class="hint">在每条事实下面写它的原因和改进。写下原因，并关联到具体事实；写下要做的事就行。' +
+      '验证可以留到以后补——它常常要等一个周期，甚至在别的目标里才闭环。</div>';
 
     var facts = goal.facts.slice().sort(function (a, b) {
       return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
@@ -493,7 +524,8 @@
       return h;
     }
 
-    h += '<div class="timeline" style="margin-top:12px">';
+    h += '<div class="muted small" style="margin-top:12px">时间线（' + facts.length + '）</div>';
+    h += '<div class="timeline" style="margin-top:8px">';
     for (var i = 0; i < facts.length; i++) {
       var f = facts[i];
       var cause = causeOfFact(goal, f.id);
@@ -502,14 +534,8 @@
         '<div class="tl-time">' + esc(f.timelineAt || '未标时间') + '</div>' +
         '<div class="tl-body">' +
         '<div class="fact-txt">' + esc(f.content) + '</div>' +
-        '<div class="fact-ln"><span class="fl-h">原因</span>' +
-        '<div class="crit-row"><input type="text" class="cause-in" data-fact="' + esc(f.id) +
-        '" value="' + esc(cause ? cause.text : '') + '" placeholder="例：模板入口太多，新手卡住了">' +
-        '<button class="btn sm ghost" data-act="save-cause" data-fact="' + esc(f.id) + '">存</button></div></div>' +
-        '<div class="fact-ln"><span class="fl-h">改进</span>' +
-        '<div class="crit-row"><input type="text" class="action-in" data-fact="' + esc(f.id) +
-        '" value="' + esc(action ? action.title : '') + '" placeholder="例：默认推荐一个模板">' +
-        '<button class="btn sm ghost" data-act="save-action" data-fact="' + esc(f.id) + '">存</button></div></div>' +
+        factLine('原因', cause, f.id, 'cause') +
+        factLine('改进', action, f.id, 'action') +
         (action ? actionItemHtml(action) : '') +
         '<div class="row end" style="margin-top:6px">' +
         '<button class="btn sm ghost" data-act="del-fact" data-id="' + esc(f.id) + '">删除事实</button></div>' +
@@ -697,6 +723,8 @@
 
     if (route.view === 'goals') {
       editingGoal = false;
+      editCauseFact = null;
+      editActionFact = null;
       view.innerHTML = renderGoals();
       renderTabbar();
       return;
@@ -704,6 +732,8 @@
 
     if (route.view === 'stats') {
       editingGoal = false;
+      editCauseFact = null;
+      editActionFact = null;
       view.innerHTML = renderStats();
       renderTabbar();
       return;
@@ -855,13 +885,65 @@
     return ng;
   }
 
+  // ---------- 长按目标卡片 ----------
+  var pressTimer = null;
+  var pressCard = null;
+  var pressAt = 0;          // 长按弹出的时刻，用来吃掉随之而来的那次点击
+  var pressId = null;       // 长按的那张卡片
+  var PRESS_MS = 550;
+  var PRESS_CLICK_GUARD = 1500;
+
+  function startPress(e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var card = t.closest('.proj-card');
+    if (!card || !card.getAttribute('data-id')) return;
+    cancelPress();
+    pressCard = card;
+    card.classList.add('pressing');
+    pressTimer = setTimeout(function () {
+      pressTimer = null;
+      pressCard = null;
+      var id = card.getAttribute('data-id');
+      pressAt = Date.now();
+      pressId = id;
+      openGoalMenu(id);
+    }, PRESS_MS);
+  }
+
+  function cancelPress() {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    if (pressCard) { pressCard.classList.remove('pressing'); pressCard = null; }
+  }
+
   // ---------- 事件绑定 ----------
   function bind() {
     var view = $('view');
     var modal = $('modal-root');
 
+    document.addEventListener('mousedown', function (e) { startPress(e); });
+    document.addEventListener('touchstart', function (e) { startPress(e); }, { passive: true });
+    document.addEventListener('mouseup', cancelPress);
+    document.addEventListener('touchend', cancelPress);
+    document.addEventListener('touchcancel', cancelPress);
+    document.addEventListener('touchmove', cancelPress, { passive: true });
+    document.addEventListener('contextmenu', function (e) {
+      if (e.target && e.target.closest && e.target.closest('.proj-card')) e.preventDefault();
+    });
+
     document.addEventListener('click', function (e) {
       var el = e.target;
+      // 长按刚弹过菜单，这一下点击是抬手带出来的，别让它打开目标
+      if (pressAt && (Date.now() - pressAt) < PRESS_CLICK_GUARD && el && el.closest) {
+        var pc = el.closest('.proj-card');
+        if (pc && pc.getAttribute('data-id') === pressId) {
+          pressAt = 0;
+          pressId = null;
+          return;
+        }
+      }
+      pressAt = 0;
+      pressId = null;
       var actEl = null;
       if (el && el.getAttribute) actEl = el.getAttribute('data-act');
       if (!actEl && el && el.closest) {
@@ -924,14 +1006,11 @@
         go('#/review/' + id);
         return;
       }
-      if (actEl === 'delete-goal') {
-        var dg = store.getGoal(id);
-        var dname = dg ? short(dg.goal.description || '未填目标', 16) : '';
-        confirmBox('删除《' + dname + '》？它的结果、事实、原因和改进都会一起删掉，撤不回来。', function () {
-          store.deleteGoal(id);
-          notify('目标已删除', 'ok');
-          render();
-        });
+      if (actEl === 'delete-goal-now') {
+        closeModal();
+        store.deleteGoal(id);
+        notify('目标已删除', 'ok');
+        render();
         return;
       }
       if (actEl === 'submit-review') {
@@ -1048,6 +1127,16 @@
       }
 
       // --- 原因：写在事实下面 ---
+      if (actEl === 'edit-cause') {
+        editCauseFact = el.getAttribute('data-fact') || null;
+        render();
+        return;
+      }
+      if (actEl === 'edit-action') {
+        editActionFact = el.getAttribute('data-fact') || null;
+        render();
+        return;
+      }
       if (actEl === 'save-cause') {
         var factId = el.getAttribute('data-fact') || '';
         var cInput = document.querySelector('.cause-in[data-fact="' + factId + '"]');
@@ -1062,6 +1151,7 @@
           } else {
             toast('还没写原因', 'err');
           }
+          editCauseFact = null;
           render();
           return;
         }
@@ -1072,6 +1162,7 @@
           store.addCause(cg.id, { text: ctext.trim(), factId: factId });
           notify('原因已记下', 'ok');
         }
+        editCauseFact = null;
         render();
         return;
       }
@@ -1111,6 +1202,7 @@
           store.addAction(ag.id, { title: atitle.trim(), factId: afactId });
           notify('改进措施已记下', 'ok');
         }
+        editActionFact = null;
         render();
         return;
       }

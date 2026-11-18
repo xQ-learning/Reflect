@@ -135,8 +135,47 @@ def run(d):
                   and sum(widths) >= r.get("tabBarWidth", 0) * 0.9,
                   "widths=%s bar=%s" % (widths, r.get("tabBarWidth")))
 
+    # 长按目标弹出的删除菜单
+    print("\n[布局] 长按删除菜单")
+    d.execute("location.hash = '#/goals'; return true;")
+    time.sleep(0.6)
+    d.execute("""
+      var card = document.querySelector('.proj-card');
+      if (!card) return false;
+      card.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+      return true;
+    """)
+    time.sleep(0.9)
+    d.execute("document.documentElement.style.zoom = arguments[0]; return true;", [ZOOM])
+    time.sleep(0.4)
+    r = d.execute("""
+      var m = document.querySelector('.modal');
+      if (!m) return {no: true};
+      var r = m.getBoundingClientRect();
+      var btns = m.querySelectorAll('.modal-foot .btn');
+      var tiny = [];
+      for (var i=0;i<btns.length;i++){
+        var b = btns[i].getBoundingClientRect();
+        if (b.height < 40) tiny.push(btns[i].textContent.trim()+':'+Math.round(b.height));
+      }
+      return {w: Math.round(r.width), h: Math.round(r.height),
+              bottom: Math.round(r.bottom), winH: window.innerHeight, winW: window.innerWidth,
+              btns: btns.length, tiny: tiny};
+    """)
+    d.execute("document.documentElement.style.zoom = ''; return true;")
+    check("删除菜单已渲染", not r.get("no"), str(r))
+    check("删除菜单宽度不溢出", r["w"] <= r["winW"], str(r))
+    check("删除菜单纵向不超出视口", r["bottom"] <= r["winH"] + 2, str(r))
+    check("删除菜单有两个按钮且够大", r["btns"] == 2 and not r["tiny"], str(r))
+
     # 补录验证弹层
     print("\n[布局] 补录验证弹层")
+    d.execute("""
+      var c = document.querySelector('[data-act=cl-cancel]');
+      if (c) c.click();
+      return true;
+    """)
+    time.sleep(0.3)
     d.execute("location.hash = '#/review/demo-current-clip'; return true;")
     time.sleep(0.6)
     d.execute("document.querySelector('[data-act=act-close]').click(); return true;")

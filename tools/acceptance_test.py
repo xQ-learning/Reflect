@@ -157,8 +157,7 @@ def run(d):
       return {hash: location.hash, heads: heads,
               hasResult: !!document.getElementById('r-actual'),
               hasFact: !!document.getElementById('f-content'),
-              hasCause: !!v.querySelector('.cause-in'),
-              hasAction: !!v.querySelector('.action-in'),
+              factRows: v.querySelectorAll('.fact-ln').length,
               hasSubmit: !!v.querySelector('[data-act=submit-review]'),
               steps: v.querySelectorAll('.bstrip .badge').length};
     """)
@@ -166,7 +165,7 @@ def run(d):
     check("复盘页纵向四块：目标/结果/事实/原因与改进",
           opened["heads"] == ["目标", "结果", "事实", "原因与改进"], str(opened["heads"]))
     check("四块的内容区都在", opened["hasResult"] and opened["hasFact"]
-          and opened["hasCause"] and opened["hasAction"], str(opened))
+          and opened["factRows"] >= 2, str(opened))
     check("有四步进度条", opened["steps"] == 4, str(opened["steps"]))
     check("已有目标可以提交复盘", opened["hasSubmit"], str(opened["hasSubmit"]))
 
@@ -355,8 +354,11 @@ def run(d):
       return {hasLayer: !!b.querySelector('#c-layer'),
               hasTimeline: !!b.querySelector('.timeline'),
               items: items.length,
+              lines: b.querySelectorAll('.fact-ln').length,
               causeInputs: b.querySelectorAll('.cause-in').length,
               actionInputs: b.querySelectorAll('.action-in').length,
+              readOnly: b.querySelectorAll('.fl-ro').length,
+              editBtns: b.querySelectorAll('[data-act=edit-cause],[data-act=edit-action]').length,
               hasStandaloneCause: !!b.querySelector('#c-text'),
               hasFactPicker: !!b.querySelector('#c-facts'),
               hasStandaloneAction: !!b.querySelector('#a-title'),
@@ -364,15 +366,23 @@ def run(d):
               hasMetric: !!b.querySelector('#a-metric'),
               firstCauseValue: first ? (first.querySelector('.cause-in') || {}).value : '',
               firstActionValue: first ? (first.querySelector('.action-in') || {}).value : '',
+              firstCauseRO: first ? (first.querySelector('.fl-ro') || {}).textContent || '' : '',
               text: b.textContent};
     """)
     check("归因没有层级选择", not causes["hasLayer"], str(causes))
     for word in ["目标翻译", "执行（", "资源（", "外部（", "层级"]:
         check("归因不出现「%s」" % word, word not in causes["text"], "")
     check("时间线搬进了原因与改进块", causes["hasTimeline"], str(causes))
-    check("每条事实下面都有原因与改进两个输入",
-          causes["items"] > 0 and causes["causeInputs"] == causes["items"]
-          and causes["actionInputs"] == causes["items"], str(causes))
+    check("每条事实下面都有原因与改进两行",
+          causes["items"] > 0 and causes["lines"] == causes["items"] * 2, str(causes))
+    check("存过的原因/改进变成只读，并带「修改」入口",
+          causes["readOnly"] > 0 and causes["editBtns"] == causes["readOnly"], str(causes))
+    check("没写的仍留空输入框",
+          causes["causeInputs"] + causes["actionInputs"] > 0, str(causes))
+    check("时间线有文字说明", "时间线" in causes["text"], causes["text"][:80])
+    check("原因与改进块有引导说明",
+          "写它的原因" in causes["text"] or "原因和改进" in causes["text"], causes["text"][:120])
+    check("不再显示改进状态", "改进状态" not in causes["text"], causes["text"][:200])
     check("没有独立的「添加原因」表单和关联事实选择器",
           not causes["hasStandaloneCause"] and not causes["hasFactPicker"]
           and not causes["hasStandaloneAction"], str(causes))
@@ -382,7 +392,7 @@ def run(d):
           "负责人" not in causes["text"] and "截止" not in causes["text"]
           and "验证指标" not in causes["text"], "")
     check("已有原因/改进回填到对应事实下面",
-          causes["firstCauseValue"] != "" and causes["firstActionValue"] != "", str(causes))
+          causes["firstCauseValue"] != "" or causes["firstCauseRO"] != "", str(causes))
 
     noflag = d.execute("return !!document.querySelector('[data-act=toggle-key-fact]');")
     check("没有「标为关键」入口", noflag is False, str(noflag))
@@ -416,6 +426,60 @@ def run(d):
     check("在事实下面能存下原因", saved.get("cause") == "这条事实对应的原因", str(saved))
     check("原因挂到了那条事实上", saved.get("causeFactId") == saved.get("factId"), str(saved))
 
+    # 存完之后：只读显示 + 「修改」按钮
+    ro = d.execute("""
+      var v = document.getElementById('view');
+      var fi = arguments[0];
+      var rows = v.querySelectorAll('.fl-ro');
+      var hit = null;
+      for (var i=0;i<rows.length;i++){
+        if (rows[i].textContent.indexOf('这条事实对应的原因') >= 0) { hit = rows[i]; break; }
+      }
+      if (!hit) return {no: true};
+      var btn = hit.querySelector('[data-act=edit-cause]');
+      return {hasText: hit.textContent.indexOf('这条事实对应的原因') >= 0,
+              hasEdit: !!btn, fact: fi};
+    """, [saved.get("factId")])
+    check("存过的原因变成只读文字", ro.get("hasText") and not ro.get("no"), str(ro))
+    check("只读的原因旁边有「修改」", ro.get("hasEdit"), str(ro))
+
+    # 点「修改」回到输入框
+    d.execute("""
+      var rows = document.querySelectorAll('.fl-ro');
+      for (var i=0;i<rows.length;i++){
+        if (rows[i].textContent.indexOf('这条事实对应的原因') >= 0){
+          var b = rows[i].querySelector('[data-act=edit-cause]');
+          if (b) { b.click(); return true; }
+        }
+      }
+      return false;
+    """)
+    time.sleep(0.5)
+    back = d.execute("""
+      var b = window.__block('原因与改进');
+      var ins = b.querySelectorAll('.cause-in');
+      for (var i=0;i<ins.length;i++){
+        if (ins[i].value.indexOf('这条事实对应的原因') >= 0)
+          return {back: true, value: ins[i].value};
+      }
+      return {back: false};
+    """)
+    check("点「修改」回到输入框并带回原值", back.get("back"), str(back))
+
+    # 收起编辑态，回到只读
+    d.execute("""
+      var b = window.__block('原因与改进');
+      var ins = b.querySelectorAll('.cause-in');
+      for (var i=0;i<ins.length;i++){
+        if (ins[i].value.indexOf('这条事实对应的原因') >= 0){
+          document.querySelector('[data-act=save-cause][data-fact="' + ins[i].getAttribute('data-fact') + '"]').click();
+          return true;
+        }
+      }
+      return false;
+    """)
+    time.sleep(0.5)
+
     act_saved = d.execute("""
       var v = document.getElementById('view');
       var items = v.querySelectorAll('.tl-item');
@@ -448,23 +512,63 @@ def run(d):
     time.sleep(0.5)
     d.execute("location.hash = '#/goals'; return true;")
     time.sleep(0.6)
-    del_res = d.execute("""
+    # 卡片上不再有垃圾桶按钮
+    no_btn = d.execute("""
       var v = document.getElementById('view');
-      var btn = v.querySelector('[data-act=delete-goal][data-id="' + window.__tmpGoal.id + '"]');
-      if (!btn) return {no: true};
-      var before = window.Reflect.store.getGoals().length;
-      btn.click();
-      var modal = document.getElementById('modal-root');
-      var hasConfirm = !!modal.querySelector('[data-act=cf-yes]');
-      modal.querySelector('[data-act=cf-yes]').click();
-      var after = window.Reflect.store.getGoals().length;
-      var still = !!window.Reflect.store.getGoal(window.__tmpGoal.id);
-      return {id: window.__tmpGoal.id, before: before, after: after, hasConfirm: hasConfirm, still: still};
+      return {trash: v.querySelectorAll('[data-act=delete-goal]').length,
+              cards: v.querySelectorAll('.proj-card').length,
+              tip: v.textContent};
+    """)
+    check("目标卡片上没有删除按钮", no_btn.get("trash") == 0, str(no_btn))
+    check("目标页提示长按可删除", "长按" in no_btn.get("tip", ""), no_btn.get("tip", "")[:120])
+
+    # 短按不该弹出删除菜单
+    d.execute("""
+      var card = document.querySelector('.proj-card[data-id="' + window.__tmpGoal.id + '"]');
+      if (!card) return false;
+      card.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+      card.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
+      return true;
+    """)
+    time.sleep(0.9)
+    short_press = d.execute("""
+      var m = document.getElementById('modal-root');
+      return {menu: !!m.querySelector('[data-act=delete-goal-now]'),
+              hash: location.hash};
+    """)
+    check("短按不弹删除菜单", not short_press.get("menu"), str(short_press))
+
+    # 长按 → 弹出删除菜单
+    d.execute("""
+      var card = document.querySelector('.proj-card[data-id="' + window.__tmpGoal.id + '"]');
+      if (!card) return false;
+      card.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+      return true;
+    """)
+    time.sleep(0.9)
+    menu = d.execute("""
+      var m = document.getElementById('modal-root');
+      var btn = m.querySelector('[data-act=delete-goal-now]');
+      return {menu: !!btn, text: m.textContent, hasConfirm: !!m.querySelector('[data-act=cf-yes]'),
+              before: window.Reflect.store.getGoals().length};
+    """)
+    check("长按目标弹出删除菜单", menu.get("menu"), str(menu))
+    check("删除菜单没有二次确认框", not menu.get("hasConfirm"), str(menu))
+    check("删除菜单说明会连带删除", "一起删掉" in menu.get("text", ""), menu.get("text", "")[:120])
+
+    d.execute("""
+      var b = document.querySelector('[data-act=delete-goal-now]');
+      if (b) b.click();
+      return true;
     """)
     time.sleep(0.7)
-    check("目标页有删除入口", not del_res.get("no"), str(del_res))
-    check("删除前有二次确认", del_res.get("hasConfirm"), str(del_res))
-    check("确认后目标被删掉", del_res.get("after") == del_res.get("before", 0) - 1, str(del_res))
+    del_res = d.execute("""
+      var gs = window.Reflect.store.getGoals();
+      var still = false;
+      for (var i=0;i<gs.length;i++) if (gs[i].id === window.__tmpGoal.id) still = true;
+      return {after: gs.length, still: still};
+    """)
+    check("菜单里点删除，目标被删掉", del_res.get("after") == menu.get("before", 0) - 1, str(del_res))
     check("删掉的目标确实没了", not del_res.get("still"), str(del_res))
 
     # ---------- D. 提交复盘 ----------
