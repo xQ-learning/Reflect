@@ -4,44 +4,42 @@
    配色：墨蓝底 + 羊皮纸字 + 暗金点缀，正文不用纯白 */
 
 :root {
-  /* 底色：顶部深石板 → 底部近黑，纯粹一层渐变，没有任何花纹 */
-  --bg: #0a0c10;
-  --bg-top: #11141a;
-  --bg-soft: #12151b;
-  /* 卡片：只比背景亮一点点，靠阴影和反光分层，不靠彩色描边 */
-  --card: #1a1e26;
-  --card-2: #21262f;
-  --line: #262b34;
-  /* 主文字：接近纯白但不是纯白 */
-  --text: #e8e9ec;
-  --text-dim: #b9bcc4;
-  --muted: #9095a0;
-  /* 唯一的强调色：香槟金。只用在关键数字、进度、主按钮、焦点环 */
-  --gold: #c9a86a;
-  --gold-hi: #e0c48f;
-  --gold-deep: #8d7442;
-  --gold-soft: rgba(201, 168, 106, .12);
-  --gold-line: rgba(201, 168, 106, .16);
-  --accent: #c9a86a;
-  --accent-soft: rgba(201, 168, 106, .12);
-  /* 实心按钮：香槟金底 + 墨色字，对比度 8.1:1，满足 WCAG AA */
-  --accent-solid: #b99a5e;
-  --accent-solid-hover: #a88a52;
-  /* 松石绿：代表成长与冷静，只用在「已闭环」这类正向状态 */
-  --teal: #7fa9a4;
-  --teal-soft: rgba(127, 169, 164, .12);
-  /* 战斗语义色：全部低饱和，不刺眼 */
-  --ok: #8fb99f;
-  --warn: #cfae6a;
-  --danger: #cf7d7d;
-  --cyan: #7fa9a4;
-  --purple: #9aa3b0;
+  /* 背景层：黑曜石 #0B0C10，纯净无网格，给眼睛留白 */
+  --bg: #0b0c10;
+  --bg-top: #101218;
+  --bg-soft: #0f1014;          /* 输入框内底：比卡片暗，暗示「可以在此书写」 */
+  /* 卡片层：深岩灰，比底色略亮，产生层级 */
+  --card: #15171e;
+  --card-2: #191c24;          /* 内嵌块 */
+  --line: rgba(255, 255, 255, .08);   /* 所有描边都是半透明极细线 */
+  /* 文字层：钛白 / 银灰 / 暗灰 */
+  --text: #f3f4f6;            /* 钛白，不用纯白 */
+  --text-dim: #9ca3af;        /* 银灰：正文段落 */
+  --muted: #868b95;           /* 暗灰：次要提示（文字版，AA 安全） */
+  --faint: #4b5563;           /* 更暗的灰：只给图标和分隔线用 */
+  /* 强调色：香槟金。极小面积使用（文字 / 细边框 / 图标 / 进度条） */
+  --gold: #c5a880;
+  --gold-hi: #d4af37;
+  --gold-deep: #7a5f34;
+  --gold-soft: rgba(197, 168, 128, .10);
+  --gold-line: rgba(197, 168, 128, .42);
+  --accent: #c5a880;
+  --accent-soft: rgba(197, 168, 128, .10);
+  --accent-solid: #b89668;
+  --accent-solid-hover: #a8885c;
+  /* 辅助状态色：暗红 / 翡翠绿 / 琥珀黄 */
+  --danger: #e02424;          /* 填充、边框、图标 */
+  --danger-text: #f87171;     /* 小字号文本用同色系亮一档，够 AA */
+  --ok: #059669;              /* 填充、边框、图标 */
+  --ok-text: #10b981;         /* 小字号文本用同色系亮一档，够 AA */
+  --warn: #d97706;
+  --warn-text: #d4af37;       /* 琥珀黄在暗底上偏暗，文字改用香槟金 */
+  --neutral: #6b7280;
   --radius: 14px;
   --tap: 44px;
   --tabbar-h: 60px;
-  /* 卡片浮在夜色上的弥散投影（带色，不是死黑） */
-  /* 卡片浮起来的那点高度：纯黑弥散影 + 顶边一道玻璃反光 */
-  --lift: 0 10px 26px rgba(0, 0, 0, .5), 0 1px 0 rgba(255, 255, 255, .05) inset;
+  /* 卡片悬浮感：不描实线边框，用极弱的弥散阴影 + 顶边一道反光 */
+  --lift: 0 4px 20px rgba(0, 0, 0, .4), 0 1px 0 rgba(255, 255, 255, .04) inset;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -51,7 +49,7 @@ html, body {
   padding: 0;
   /* 底色就是一层渐变：从顶部深石板到底部近黑，没有任何网格或噪点 */
   background-color: var(--bg);
-  background-image: linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 62%, #08090c 100%);
+  background-image: linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 46%, #0a0b0e 100%);
   background-attachment: fixed;
   color: var(--text);
   font-size: 15px;
@@ -91,8 +89,8 @@ button, input, select, textarea {
   padding: 8px 12px;
   padding-top: calc(8px + env(safe-area-inset-top, 0px));
   background:
-    linear-gradient(180deg, rgba(20, 23, 29, .96), rgba(13, 15, 19, .96));
-  border-bottom: 1px solid #21252c;
+    linear-gradient(180deg, rgba(18, 20, 25, .96), rgba(12, 13, 17, .96));
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
   box-shadow: 0 1px 0 rgba(255, 255, 255, .04), 0 8px 20px rgba(0, 0, 0, .45);
   backdrop-filter: blur(10px);
 }
@@ -120,6 +118,7 @@ button, input, select, textarea {
   min-width: var(--tap);
   min-height: var(--tap);
   border: 1px solid var(--line);
+  background: transparent;
   border-radius: 10px;
   background-color: var(--card);
   color: var(--text);
@@ -136,10 +135,10 @@ button, input, select, textarea {
 }
 
 .card {
-  /* 卡片：比背景亮一点点 + 顶边一道极弱的玻璃反光，不描彩色边 */
+  /* 卡片：深岩灰实底 + 顶边一道极弱反光，不描实线边框，靠弥散阴影悬浮 */
   background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .028), rgba(255, 255, 255, 0) 38%);
-  border: 1px solid var(--line);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 34%);
+  border: 0;
   border-radius: var(--radius);
   padding: 14px;
   margin-bottom: 12px;
@@ -184,8 +183,7 @@ h1.page-title { font-size: 19px; margin: 4px 0 14px; }
   padding: 0 14px;
   border-radius: 11px;
   border: 1px solid var(--line);
-  background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, 0));
+  background-color: rgba(255, 255, 255, .03);
   color: var(--text);
   cursor: pointer;
   font-size: 14.5px;
@@ -194,26 +192,35 @@ h1.page-title { font-size: 19px; margin: 4px 0 14px; }
 
 .btn:active { filter: brightness(.85); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-/* 主按钮：一块哑光的香槟金，只靠明度分层，不发光 */
+/* 主按钮：幽灵按钮 —— 深色底 + 香槟金文字 + 1px 香槟金细边框，不做大金块 */
 .btn.primary {
-  background-color: var(--accent-solid);
-  background-image: linear-gradient(180deg, #d3b478 0%, #b99a5e 55%, #9a7c46 100%);
-  border-color: #7d6539;
-  color: #191309;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .22);
+  background-color: rgba(197, 168, 128, .06);
+  border-color: var(--gold-line);
+  color: var(--gold);
+  font-weight: 600;
+  box-shadow: none;
 }
-.btn.primary:hover { background-color: var(--accent-solid-hover); }
-.btn.ghost { background: transparent; }
-.btn.gold {
-  border-color: #3a4049;
+.btn.primary:hover {
+  background-color: rgba(197, 168, 128, .12);
+  border-color: rgba(197, 168, 128, .72);
+}
+/* 次按钮：纯文字，无外框 */
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
   color: var(--text-dim);
-  background-color: rgba(255, 255, 255, .02);
 }
-.btn.gold:hover { border-color: #6d5a36; color: var(--gold-hi); }
-.btn.ok { border-color: rgba(143,185,159,.5); color: var(--ok); }
-.btn.warn { border-color: rgba(207,174,106,.5); color: var(--warn); }
-.btn.danger { border-color: rgba(207,125,125,.5); color: var(--danger); }
+.btn.ghost:hover { color: var(--text); }
+/* 次按钮：暗灰文字，无外框，前面带 + 号 */
+.btn.gold {
+  border-color: transparent;
+  color: var(--muted);
+  background-color: transparent;
+}
+.btn.gold:hover { color: var(--gold); }
+.btn.ok { border-color: var(--line); color: var(--ok-text); }
+.btn.warn { border-color: var(--line); color: var(--warn-text); }
+.btn.danger { border-color: var(--line); color: var(--danger-text); }
 .btn.sm { min-height: var(--tap); padding: 0 12px; font-size: 13px; border-radius: 9px; }
 .btn.block { width: 100%; }
 
@@ -232,19 +239,33 @@ input[type=text], input[type=date], input[type=number], input[type=datetime-loca
   min-height: var(--tap);
   padding: 10px 12px;
   border-radius: 11px;
-  /* 输入框：刻进底色的一道暗槽 */
-  border: 1px solid #282d36;
+  /* 输入框：深空灰内底 + 一根半透明极细线 */
+  border: 1px solid var(--line);
   background-color: var(--bg-soft);
-  background-image: linear-gradient(180deg, rgba(0, 0, 0, .28), rgba(0, 0, 0, 0));
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .35);
+  color: var(--text);
   outline: none;
 }
 
+/* 聚焦：细线框高亮成香槟金 */
 input:focus, select:focus, textarea:focus {
-  border-color: #6d5a36;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .35), 0 0 0 2px rgba(201, 168, 106, .13);
+  border-color: rgba(212, 175, 55, .7);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, .10);
+}
+
+/* 行内书写：透明底 + 一条底部下划线，不要实心大白块 */
+input.uline, textarea.uline {
+  background-color: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 0;
+  padding: 6px 2px;
+}
+input.uline:focus, textarea.uline:focus {
+  border-bottom-color: rgba(212, 175, 55, .8);
+  box-shadow: none;
 }
 textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
+#f-content { border-style: dashed; }
 select { appearance: none; background-image: none; }
 
 .inline-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -267,34 +288,34 @@ select { appearance: none; background-image: none; }
   white-space: nowrap;
 }
 
-.badge.fact { color: var(--cyan); border-color: rgba(127,169,164,.4); background: rgba(127,169,164,.1); }
-.badge.judgment { color: var(--warn); border-color: rgba(207,174,106,.4); background: rgba(207,174,106,.1); }
-.badge.emotion { color: var(--purple); border-color: rgba(154,163,176,.4); background: rgba(154,163,176,.1); }
-.badge.high { color: var(--ok); border-color: rgba(143,185,159,.4); }
-.badge.medium { color: var(--warn); border-color: rgba(207,174,106,.4); }
+.badge.fact { color: var(--ok-text); background: rgba(5, 150, 105, .10); }
+.badge.judgment { color: var(--warn-text); background: rgba(212, 175, 55, .10); }
+.badge.emotion { color: var(--neutral); background: rgba(107, 114, 128, .12); }
+.badge.high { color: var(--ok-text); }
+.badge.medium { color: var(--warn-text); }
 .badge.low { color: var(--muted); }
-.badge.verified { color: var(--cyan); border-color: rgba(127,169,164,.45); }
-.badge.pending { color: var(--warn); border-color: rgba(207,174,106,.55); border-style: dashed; }
-.badge.disputed { color: var(--danger); border-color: rgba(207,125,125,.45); }
+.badge.verified { color: var(--ok-text); background: rgba(5, 150, 105, .10); }
+.badge.pending { color: var(--warn-text); background: rgba(212, 175, 55, .10); }
+.badge.disputed { color: var(--danger-text); background: rgba(224, 36, 36, .10); }
 .badge.open { color: var(--muted); }
-.badge.doing { color: var(--gold); border-color: rgba(201,168,106,.45); }
-.badge.failed { color: var(--danger); border-color: rgba(207,125,125,.45); }
+.badge.doing { color: var(--gold); background: rgba(197, 168, 128, .10); }
+.badge.failed { color: var(--danger-text); background: rgba(224, 36, 36, .10); }
 .badge.draft { color: var(--muted); }
-.badge.running { color: var(--gold); border-color: rgba(201,168,106,.45); }
-.badge.archived { color: var(--purple); border-color: rgba(154,163,176,.45); }
-.badge.revised { color: var(--warn); border-color: rgba(207,174,106,.5); }
+.badge.running { color: var(--gold); background: rgba(197, 168, 128, .10); }
+.badge.archived { color: var(--neutral); background: rgba(107, 114, 128, .12); }
+.badge.revised { color: var(--warn-text); background: rgba(212, 175, 55, .10); }
 .badge.layer { color: var(--text-dim); }
-.badge.alert { color: var(--danger); border-color: rgba(207,125,125,.5); background: rgba(207,125,125,.1); }
+.badge.alert { color: var(--danger-text); background: rgba(224, 36, 36, .12); }
 
 /* ---------- 项目卡片 ---------- */
 .proj-card {
   display: block;
   width: 100%;
   text-align: left;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .028), rgba(255, 255, 255, 0) 38%);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
   padding: 14px;
   margin-bottom: 10px;
   cursor: pointer;
@@ -316,7 +337,7 @@ select { appearance: none; background-image: none; }
 .proj-card .gear {
   margin-top: 6px;
   font-size: 13px;
-  color: var(--text-dim);
+  color: var(--muted);
   font-weight: 500;
 }
 .proj-card .gear.muted { color: var(--muted); font-weight: 500; }
@@ -325,22 +346,21 @@ select { appearance: none; background-image: none; }
 .proj-card .gear-ok {
   display: inline-block;
   margin-left: 6px;
-  padding: 1px 8px;
+  padding: 1px 9px;
   border-radius: 999px;
+  border: 0;
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.7;
   vertical-align: 1px;
 }
 .proj-card .gear-wait {
-  color: #e0c48f;
-  border: 1px solid rgba(201, 168, 106, .38);
-  background: rgba(201, 168, 106, .09);
+  color: var(--warn-text);
+  background: rgba(212, 175, 55, .10);
 }
 .proj-card .gear-ok {
-  color: var(--teal);
-  border: 1px solid rgba(127, 169, 164, .35);
-  background: rgba(127, 169, 164, .09);
+  color: var(--ok-text);
+  background: rgba(5, 150, 105, .12);
 }
 .proj-card .meta { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
 
@@ -362,7 +382,7 @@ select { appearance: none; background-image: none; }
   display: flex;
   gap: 2px;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(180deg, rgba(19, 22, 27, .97), rgba(13, 15, 19, .97));
+  background: linear-gradient(180deg, rgba(16, 17, 22, .97), rgba(11, 12, 15, .97));
   border-top: 1px solid #232830;
   box-shadow: 0 -6px 20px rgba(0, 0, 0, .45);
   overflow-x: auto;
@@ -409,6 +429,7 @@ select { appearance: none; background-image: none; }
   font-weight: 600;
   box-shadow: none;
 }
+.tab.on svg { color: var(--gold); }
 /* 选中态只留一根极细的香槟金指示线，不画发光框 */
 .tab.on::before {
   content: "";
@@ -450,8 +471,8 @@ select { appearance: none; background-image: none; }
 .tl-time { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .tl-body {
   background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 40%);
-  border: 1px solid var(--line);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
   border-radius: 12px;
   padding: 10px 12px;
 }
@@ -470,7 +491,7 @@ select { appearance: none; background-image: none; }
 
 /* ---------- 列表项 ---------- */
 .item {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 12px;
   background-color: var(--card-2);
   background-image: linear-gradient(158deg, rgba(255, 255, 255, .025), rgba(255, 255, 255, 0) 50%);
@@ -483,7 +504,7 @@ select { appearance: none; background-image: none; }
 .item .kv b { color: var(--text); font-weight: 500; }
 
 .sub-card {
-  border: 1px dashed #333944;
+  border: 1px dashed rgba(255, 255, 255, .08);
   border-radius: 10px;
   padding: 8px 10px;
   margin-top: 8px;
@@ -497,7 +518,7 @@ select { appearance: none; background-image: none; }
   box-shadow: none;
 }
 
-.highlight .hl-tag { color: var(--danger); font-weight: 600; font-size: 12.5px; }
+.highlight .hl-tag { color: var(--danger-text); font-weight: 600; font-size: 12.5px; }
 
 .revised-box {
   border: 1px solid rgba(207,174,106,.45);
@@ -536,7 +557,7 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
   -webkit-overflow-scrolling: touch;
   background-color: var(--card);
   background-image: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, 0) 30%);
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 18px 18px 0 0;
   box-shadow: 0 -12px 44px rgba(0, 0, 0, .55);
   padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
@@ -601,15 +622,14 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
 
 /* 长按目标卡片时的按压反馈 */
 .proj-card.pressing {
-  border-color: rgba(207, 125, 125, .5);
-  background: rgba(207, 125, 125, .06);
+  background: rgba(224, 36, 36, .06);
 }
 
 /* ---------- 战报回放 ---------- */
 .card.dark {
   background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .028), rgba(255, 255, 255, 0) 40%);
-  border-color: var(--line);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
   border-radius: 16px;
   box-shadow: var(--lift);
 }
@@ -637,11 +657,11 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
 .cmp-k { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .cmp-v { min-width: 0; }
 .cmp-line { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
-.cmp-line.good { color: var(--ok); font-weight: 600; }
-.cmp-line.bad { color: var(--danger); font-weight: 600; }
+.cmp-line.good { color: var(--ok-text); font-weight: 600; }
+.cmp-line.bad { color: var(--danger-text); font-weight: 600; }
 .cmp-line.muted { color: var(--muted); }
-.cmp-line.metric .bad { color: var(--danger); }
-.cmp-line.metric .good { color: var(--ok); }
+.cmp-line.metric .bad { color: var(--danger-text); }
+.cmp-line.metric .good { color: var(--ok-text); }
 .exp-st { color: var(--gold-hi); }
 .cmp-line.metric .sep { color: var(--muted); margin: 0 6px; }
 .exp-ln {
@@ -715,32 +735,32 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
   -webkit-overflow-scrolling: touch;
   padding: 8px 0;
   margin: -4px 0 12px;
-  background: linear-gradient(180deg, rgba(14, 16, 20, .95), rgba(14, 16, 20, .88));
+  background: linear-gradient(180deg, rgba(13, 14, 18, .95), rgba(13, 14, 18, .88));
   backdrop-filter: blur(10px);
 }
 .bstrip .chip {
   flex: 0 0 auto;
   min-height: 44px;
   padding: 6px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, .06);
   border-radius: 999px;
   background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, 0));
-  color: var(--muted);
+  color: var(--text-dim);
   font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
 }
-.bstrip .chip.done { color: var(--ok); border-color: rgba(143, 185, 159, .35); }
+.bstrip .chip.done { color: var(--ok-text); border-color: rgba(5, 150, 105, .30); }
 /* 选中的步骤：金色药丸 */
 .bstrip .chip.on {
-  color: #191309;
-  background-color: var(--accent-solid);
-  background-image: linear-gradient(180deg, #d3b478 0%, #b99a5e 60%, #9a7c46 100%);
-  border-color: #7d6539;
+  /* 选中：保留深灰底，文字和图标变亮，外围一圈极细的香槟金光晕 */
+  color: var(--text);
+  background-color: var(--card);
+  border-color: var(--gold-line);
   font-weight: 600;
-  box-shadow: none;
+  box-shadow: 0 0 0 1px rgba(197, 168, 128, .18), 0 0 14px rgba(197, 168, 128, .10);
 }
+.bstrip .chip.on svg { color: var(--gold); }
 
 /* 折叠的模块 */
 .card.sec { scroll-margin-top: calc(var(--appbar-h, 53px) + 52px); }
@@ -757,33 +777,34 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
 .sec-sum { cursor: pointer; }
 .sum-t { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
 .sum-s { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.6; overflow-wrap: anywhere; }
-.sum-s.bad { color: var(--danger); font-weight: 600; }
+.sum-s.bad { color: var(--danger-text); font-weight: 600; }
 
 /* 差距汇总（时间线上面） */
 .gap-sum {
   margin-bottom: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-left: 2px solid rgba(207, 125, 125, .55);
+  border: 0;
+  border-left: 2px solid rgba(224, 36, 36, .55);
   border-radius: 12px;
-  background-color: rgba(255, 255, 255, .015);
+  background-color: rgba(224, 36, 36, .05);
 }
 .gap-sum .gs-t { font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
 .gap-sum .gs-s { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
-.gap-sum .gs-s.bad { color: var(--danger); font-weight: 600; }
+.gap-sum .gs-s.bad { color: var(--danger-text); font-weight: 600; }
 
 /* 事实与归因：像聊天记录 */
 .chat { margin-top: 4px; }
 .chat-card {
   position: relative;
   background-color: var(--card-2);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .025), rgba(255, 255, 255, 0) 40%);
-  border: 1px solid var(--line);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
   border-radius: 14px;
   padding: 12px 14px;
   box-shadow: var(--lift);
 }
 .chat-fact { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; padding-right: 26px; }
+/* 危险操作：极小的垃圾桶图标，暗灰，点上去才变红 */
 .chat-del {
   position: absolute;
   top: 2px;
@@ -792,17 +813,17 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
   height: 44px;
   border: none;
   background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  opacity: .3;
+  color: var(--faint);
+  font-size: 12px;
+  opacity: .9;
   cursor: pointer;
 }
-.chat-del:hover { opacity: .95; color: var(--danger); }
+.chat-del:hover { opacity: 1; color: var(--danger); }
 .reply {
   margin-top: 10px;
   padding: 12px 12px;
   min-height: 44px;
-  border-left: 2px solid #2f3540;
+  border-left: 2px solid rgba(255, 255, 255, .10);
   border-radius: 0 10px 10px 0;
   background: rgba(255, 255, 255, .022);
   font-size: 14px;
@@ -813,7 +834,7 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
 .reply .ghost { color: var(--muted); }
 .reply b { color: var(--text-dim); font-weight: 600; }
 .reply b.k-gear { color: var(--gold); }
-.reply.edit { cursor: default; border-left-color: #6d5a36; }
+.reply.edit { cursor: default; border-left-color: rgba(197, 168, 128, .5); }
 .reply.edit input[type="text"] { margin-bottom: 0; }
 /* 状态标签：待验证像「未鉴定的装备」——琥珀虚线框；已闭环像已装备——青蓝发光 */
 /* 状态标签：小巧的胶囊。外面套一个 44px 的点击区，保证手按得中 */
@@ -832,35 +853,34 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
   display: inline-block;
   padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, .03);
+  border: 0;
+  background: rgba(255, 255, 255, .04);
   color: var(--muted);
   font-size: 11.5px;
   line-height: 1.6;
   white-space: nowrap;
 }
+/* 待验证：暗黄底 + 金色字 */
 .st-chip.pending {
-  color: #e0c48f;
-  border-color: rgba(201, 168, 106, .42);
-  background: rgba(201, 168, 106, .10);
+  color: var(--warn-text);
+  background: rgba(212, 175, 55, .10);
 }
+/* 已闭环：暗绿底 + 绿色字 */
 .st-chip.verified {
-  color: var(--teal);
-  border-color: rgba(127, 169, 164, .42);
-  background: rgba(127, 169, 164, .10);
+  color: var(--ok-text);
+  background: rgba(5, 150, 105, .12);
 }
 .st-chip.failed {
-  color: var(--danger);
-  border-color: rgba(207, 125, 125, .42);
-  background: rgba(207, 125, 125, .10);
+  color: var(--danger-text);
+  background: rgba(224, 36, 36, .12);
 }
-.st-hit:hover .st-chip { border-color: #6d5a36; }
+.st-hit:hover .st-chip { background: rgba(255, 255, 255, .07); }
 
 /* 写一条新事实 */
 .newfact {
   margin-top: 14px;
   padding: 12px 14px;
-  border: 1px dashed #333944;
+  border: 1px dashed rgba(255, 255, 255, .08);
   border-radius: 14px;
   background: rgba(255, 255, 255, .015);
 }
@@ -869,19 +889,32 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
 .mood {
   min-height: 44px;
   padding: 4px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, .06);
   border-radius: 999px;
-  background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .025), rgba(255, 255, 255, 0));
-  color: var(--muted);
+  background-color: rgba(255, 255, 255, .03);
+  color: var(--text-dim);
   font-size: 13.5px;
   cursor: pointer;
 }
+/* 选中的情绪胶囊：暗红 / 暗绿 / 暗黄的微光底 + 同色细边 */
 .mood.on {
   color: var(--text);
-  border-color: #6d5a36;
-  background: var(--gold-soft);
   font-weight: 600;
+}
+.mood-bad.on {
+  color: var(--danger-text);
+  border-color: rgba(224, 36, 36, .55);
+  background: rgba(224, 36, 36, .12);
+}
+.mood-good.on {
+  color: var(--ok-text);
+  border-color: rgba(5, 150, 105, .55);
+  background: rgba(5, 150, 105, .12);
+}
+.mood-flat.on {
+  color: var(--warn-text);
+  border-color: rgba(212, 175, 55, .55);
+  background: rgba(212, 175, 55, .12);
 }
 
 /* 顶栏标题居中（战报回放）：标题跨整条栏居中，左右按钮各站一边 */
@@ -902,8 +935,8 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
 }
 .stat-box {
   background-color: var(--card);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .028), rgba(255, 255, 255, 0) 38%);
-  border: 1px solid var(--line);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 36%);
+  border: 0;
   border-radius: 12px;
   padding: 10px 12px;
   box-shadow: var(--lift);
@@ -968,9 +1001,9 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
 
 .toast {
   max-width: 88vw;
-  background-color: #1b1f27;
+  background-color: #1a1d24;
   background-image: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, 0));
-  border: 1px solid var(--line);
+  border: 0;
   color: var(--text);
   border-radius: 12px;
   padding: 10px 14px;
@@ -988,7 +1021,7 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
   text-align: center;
   color: var(--muted);
   padding: 34px 12px;
-  border: 1px dashed #333944;
+  border: 1px dashed rgba(255, 255, 255, .08);
   border-radius: var(--radius);
 }
 .empty .e-t { color: var(--text); font-weight: 600; margin-bottom: 6px; }
@@ -1000,8 +1033,7 @@ table.tbl th { color: var(--gold-hi); font-weight: 500; background: var(--bg-sof
   font-size: 12.5px;
   line-height: 1.6;
   background-color: var(--bg-soft);
-  background-image: linear-gradient(180deg, rgba(0, 0, 0, .25), rgba(0, 0, 0, 0));
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 12px;
   padding: 12px;
   max-height: 46vh;

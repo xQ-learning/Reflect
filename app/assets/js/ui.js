@@ -442,7 +442,7 @@
         '</div>';
     }
     h += '</div>' +
-      '<button class="btn sm" data-act="add-crit">+ 再加一条</button>' +
+      '<button class="btn sm gold" data-act="add-crit">+ 再加一条</button>' +
       '</div>' +
       '<div class="row end" style="margin-top:12px">' +
       (isNew ? '' : '<button class="btn ghost" data-act="cancel-edit">取消</button>') +
@@ -610,7 +610,7 @@
     // 原因
     if (editCauseFact === f.id) {
       h += '<div class="reply edit"' + (anchor ? ' id="' + anchor + '"' : '') + '>' +
-        '<input type="text" class="cause-in" data-fact="' + esc(f.id) + '" value="' + esc(cause ? cause.text : '') +
+        '<input type="text" class="cause-in uline" data-fact="' + esc(f.id) + '" value="' + esc(cause ? cause.text : '') +
         '" placeholder="这条事实的原因">' +
         '<span class="row" style="gap:6px;margin-top:6px">' +
         '<button class="btn sm ghost" data-act="save-cause" data-fact="' + esc(f.id) + '">存</button>' +
@@ -624,7 +624,7 @@
 
     // 装备
     if (editActionFact === f.id) {
-      h += '<div class="reply edit"><input type="text" class="action-in" data-fact="' + esc(f.id) +
+      h += '<div class="reply edit"><input type="text" class="action-in uline" data-fact="' + esc(f.id) +
         '" value="' + esc(action ? action.title : '') + '" placeholder="要做什么改进">' +
         '<span class="row" style="gap:6px;margin-top:6px">' +
         '<button class="btn sm ghost" data-act="save-action" data-fact="' + esc(f.id) + '">存</button>' +
@@ -667,9 +667,9 @@
     h += '<div class="newfact">' +
       '<div class="nf-t">▼ 写一条新事实 / 记录新情况</div>' +
       '<div class="nf-moods">' +
-      '<button class="mood' + (pendingMood === 'bad' ? ' on' : '') + '" data-act="set-mood" data-mood="bad">🔴 翻车</button>' +
-      '<button class="mood' + (pendingMood === 'good' ? ' on' : '') + '" data-act="set-mood" data-mood="good">🟢 爽点</button>' +
-      '<button class="mood' + (pendingMood === 'flat' ? ' on' : '') + '" data-act="set-mood" data-mood="flat">🟡 平平</button>' +
+      '<button class="mood mood-bad' + (pendingMood === 'bad' ? ' on' : '') + '" data-act="set-mood" data-mood="bad">🔴 翻车</button>' +
+      '<button class="mood mood-good' + (pendingMood === 'good' ? ' on' : '') + '" data-act="set-mood" data-mood="good">🟢 爽点</button>' +
+      '<button class="mood mood-flat' + (pendingMood === 'flat' ? ' on' : '') + '" data-act="set-mood" data-mood="flat">🟡 平平</button>' +
       '</div>' +
       '<textarea id="f-content" data-act="f-content" placeholder="记录刚刚发生了什么...">' + esc(pendingFactText) + '</textarea>' +
       '<div class="row end" style="margin-top:8px">' +
