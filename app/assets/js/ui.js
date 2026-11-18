@@ -743,22 +743,12 @@
   }
 
   // ---------- 战报回放（只读）：预期 vs 现实 + 经验时间线 ----------
-  // 事实的颜色：文本里带正向词就算好消息
-  var GOOD_WORDS = ['爽', '成功', '顺利', '满意', '喜欢', '不错', '顺畅', '提升', '省时', '省心'];
   var MOOD = { bad: '🔴', good: '🟢', flat: '🟡' };
 
-  // 情绪：优先用记录时选的那个，老数据按文本猜
+  // 情绪：口径统一走 store.factMood，复盘页 / 战报回放 / 导出报告不会打架
   function moodOf(f) {
-    if (f && f.mood && MOOD[f.mood]) return f.mood;
-    return isGoodFact(f ? f.content : '') ? 'good' : 'bad';
-  }
-
-  function isGoodFact(text) {
-    var t = String(text || '');
-    for (var i = 0; i < GOOD_WORDS.length; i++) {
-      if (t.indexOf(GOOD_WORDS[i]) >= 0) return true;
-    }
-    return false;
+    var m = store.factMood(f);
+    return MOOD[m] ? m : 'flat';
   }
 
   // 2026-11-16 14:30 → 11-16 14:30
@@ -784,7 +774,7 @@
       h += '<div class="tl-item">' +
         '<div class="tl-time">🕒 ' + esc(shortTime(f.timelineAt) || '未标时间') + '</div>' +
         '<div class="tl-body">' +
-        '<div class="fact-txt">' + (isGoodFact(f.content) ? '🟢 ' : '🔴 ') + esc(f.content) + '</div>' +
+        '<div class="fact-txt">' + MOOD[moodOf(f)] + ' ' + esc(f.content) + '</div>' +
         '<div class="exp-ln"><span class="exp-k">🔍 原因</span>' +
         '<div class="exp-v">' +
         (cause ? esc(cause.text) : '<span class="muted">—</span>') + '</div></div>' +

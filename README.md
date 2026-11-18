@@ -51,6 +51,7 @@
 
 写完的原因显示成 `🔍 原因：…`，装备显示成 `🔧 装备：…` 并带一个 `[状态: 待验证]` 的小标记（点它切换状态）。
 事实卡片右上角有个极淡的 🗑️，点一下才删。写新事实时先选情绪（🔴翻车 / 🟢爽点 / 🟡平平），时间自动记。
+**这个情绪标签在战报回放里原样显示**，两处不会打架（都走 `store.factMood`）。
 
 **事实是唯一锚点**：原因和改进都写在某条事实下面（一条事实各一条）。
 没有事实就没有归因和改进 —— 改进必须从观察里长出来，不能是凭空许的愿。
@@ -93,7 +94,7 @@
 接手时按这个顺序走：
 
 1. `git status` —— 确认只有预期改动
-2. `python3 tools/acceptance_test.py`（150 项）和 `python3 tools/layout_check.py`（53 项）必须全过。前端是纯 JS，测试用 geckodriver 驱动真实 Firefox 渲染断言，不是 mock
+2. `python3 tools/acceptance_test.py`（153 项）和 `python3 tools/layout_check.py`（53 项）必须全过。前端是纯 JS，测试用 geckodriver 驱动真实 Firefox 渲染断言，不是 mock
 3. `./build.sh` —— 产出已签名的 `build/reflect.apk`（密钥自动生成在 `keystore/reflect.jks`，**别删，覆盖安装要同一个密钥**）
 4. 交付到 `/mnt/hgfs/app/reflect-vX.Y.Z.apk` + 同名 `.sha256`（用 `install -m 644`，`cp` 会被拦）
 5. `git add -A && git commit && git push`
@@ -220,7 +221,9 @@ goals[] = {
 }
 ```
 
-- `facts[]`：`{ id, content, timelineAt, mood(bad/good/flat) }` —— `mood` 是记录时选的情绪，老数据没有这个字段时按文本里的正向词推断
+- `facts[]`：`{ id, content, timelineAt, mood(bad/good/flat) }` —— `mood` 是记录时选的情绪。
+  情绪口径统一在 `store.factMood(f)`：**复盘页、战报回放、导出报告三处必须显示同一个标记**。
+  老数据没有这个字段时，文本里带正向词算 🟢爽点，其余一律按 🟡平平 处理（没标情绪就是没标，不默认扣红）
 - `causes[]`：`{ id, text, factId }` —— 锚到一条事实
 - `actions[]`：`{ id, title, factId, verifyResult, status(open/verified/failed), closedAt }`
 
@@ -253,7 +256,7 @@ goals[] = {
 ## 测试
 
 ```bash
-python3 tools/acceptance_test.py   # 功能与验收测试（150 项）
+python3 tools/acceptance_test.py   # 功能与验收测试（153 项）
 python3 tools/layout_check.py       # 移动端布局体检（53 项）
 ```
 

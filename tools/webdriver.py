@@ -58,8 +58,15 @@ class WebDriver:
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(self.base + path, data=data, method=method)
         req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            raw = resp.read().decode()
+        if os.environ.get("WD_DEBUG"):
+            print("REQ", method, path, repr(body)[:400])
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                raw = resp.read().decode()
+        except urllib.error.HTTPError as e:
+            # geckodriver 的报错正文在 body 里，直接抛出来省得瞎猜
+            raise RuntimeError("%s %s -> HTTP %s: %s" % (
+                method, path, e.code, e.read().decode()[:500]))
         return json.loads(raw) if raw.strip() else {}
 
     def new_session(self, width=430, height=900, retries=3):

@@ -327,6 +327,21 @@
     return f;
   }
 
+  // 事实的情绪：优先用记录时选的那个。
+  // 老数据没有情绪字段时，正向词算爽点，其余一律按「平平」处理——
+  // 没标情绪就是没标，不该默认扣一个红。
+  // 复盘页、战报回放、导出报告都走这里，保证三处口径一致。
+  var GOOD_WORDS = ['爽', '成功', '顺利', '满意', '喜欢', '不错', '顺畅', '提升', '省时', '省心'];
+  function factMood(f) {
+    if (!f) return 'flat';
+    if (f.mood === 'good' || f.mood === 'flat' || f.mood === 'bad') return f.mood;
+    var t = String(f.content || '');
+    for (var i = 0; i < GOOD_WORDS.length; i++) {
+      if (t.indexOf(GOOD_WORDS[i]) >= 0) return 'good';
+    }
+    return 'flat';
+  }
+
   function updateFact(goalId, factId, patch) {
     var g = findGoal(goalId);
     if (!g) return null;
@@ -715,6 +730,7 @@
     addFact: addFact,
     updateFact: updateFact,
     removeFact: removeFact,
+    factMood: factMood,
     // 原因
     addCause: addCause,
     updateCause: updateCause,

@@ -850,6 +850,45 @@ def run(d):
     check("导出弹层有写入文件与分享", modal["hasSave"] and modal["hasShare"], str(modal))
     d.execute("document.querySelector('[data-act=cl-cancel]') ? null : null; return true;")
 
+    # ---------- 情绪标签：战报回放必须和复盘页一致 ----------
+    print("\n[UI] 事实情绪一致性")
+    d.execute("""
+      var st = window.Reflect.store;
+      var g = st.getGoal('demo-current-clip');
+      st.addFact(g.id, {content: '情绪探针A：导出很顺利', timelineAt: '2026-11-17 09:00', mood: 'good'});
+      var g2 = st.getGoal('demo-current-clip');
+      st.addFact(g2.id, {content: '情绪探针B：导出卡住了', timelineAt: '2026-11-17 09:10', mood: 'flat'});
+      return true;
+    """)
+    time.sleep(0.4)
+
+    def fact_texts(sel):
+        # 注意：情绪是星形 emoji（代理对），取首字必须按码点切，
+        # charAt(0) 会切出半个代理对，geckodriver 序列化时会直接报 400
+        return d.execute("""
+          var out = [];
+          var fs = document.querySelectorAll(arguments[0]);
+          for (var i=0;i<fs.length;i++) out.push(fs[i].textContent.trim());
+          return out;
+        """, [sel])
+
+    def moods_of(texts):
+        return [t[0] if t else '' for t in texts]
+
+    d.execute("location.hash = '#/review/demo-current-clip'; return true;")
+    time.sleep(0.6)
+    review_moods = moods_of(fact_texts('#sec-facts .chat-fact'))
+    d.execute("location.hash = '#/view/demo-current-clip'; return true;")
+    time.sleep(0.6)
+    view_moods = moods_of(fact_texts('#view .fact-txt'))
+    check("战报回放与复盘页的事实情绪逐条一致",
+          review_moods == view_moods and len(view_moods) > 0,
+          "复盘 %s / 回放 %s" % (review_moods, view_moods))
+    check("提交的情绪标签原样出现在战报回放里",
+          "🟢" in view_moods and "🟡" in view_moods, str(view_moods))
+    check("没有情绪标记的老事实不再一律判红",
+          "🔴" not in view_moods, str(view_moods))
+
     # ---------- 全流程 UI 渲染 ----------
     print("\n[UI] 各页面渲染")
     pages = [

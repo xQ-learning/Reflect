@@ -6,6 +6,14 @@
   var R = global.Reflect = global.Reflect || {};
 
   var ACTION_STATE_CN = { open: '待验证', verified: '已闭环', failed: '未生效' };
+  var MOOD_MARK = { bad: '🔴', good: '🟢', flat: '🟡' };
+
+  // 事实的情绪标记：和复盘页 / 战报回放同一套口径（store.factMood）
+  function moodMark(f) {
+    var st = global.Reflect && global.Reflect.store;
+    var m = st ? st.factMood(f) : 'flat';
+    return MOOD_MARK[m] || MOOD_MARK.flat;
+  }
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -112,7 +120,8 @@
       L.push('| 时间 | 内容 |');
       L.push('| --- | --- |');
       for (var f = 0; f < facts.length; f++) {
-        L.push('| ' + cell(facts[f].timelineAt) + ' | ' + cell(facts[f].content) + ' |');
+        L.push('| ' + cell(facts[f].timelineAt) + ' | ' +
+          moodMark(facts[f]) + ' ' + cell(facts[f].content) + ' |');
       }
       L.push('');
     }
