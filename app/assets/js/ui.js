@@ -71,6 +71,11 @@
     return (b.updatedAt || 0) - (a.updatedAt || 0);
   }
 
+  // 事实按时间点排
+  function byTimeline(a, b) {
+    return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
+  }
+
   // ---------- Toast ----------
   function toast(msg, kind) {
     var host = $('toast-root');
@@ -209,6 +214,7 @@
     var h = String(global.location.hash || '').replace(/^#\/?/, '');
     var parts = h.split('/').filter(function (x) { return x !== ''; });
     if (parts[0] === 'review' && parts[1]) return { view: 'review', id: parts[1] };
+    if (parts[0] === 'view' && parts[1]) return { view: 'view', id: parts[1] };
     if (parts[0] === 'stats') return { view: 'stats', id: null };
     return { view: 'goals', id: null };
   }
@@ -231,7 +237,14 @@
     var sub = '<span class="sub">把差距变成下一次的动作</span>';
     var right = '';
 
-    if (route.view === 'review') {
+    if (route.view === 'view') {
+      title = '审阅';
+      sub = '';
+      var vg = store.getGoal(route.id);
+      if (vg) {
+        right = '<button class="btn sm" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑</button>';
+      }
+    } else if (route.view === 'review') {
       title = '复盘';
       sub = '';
       var g = route.id === 'new' ? null : store.getGoal(route.id);
@@ -254,9 +267,10 @@
     if (!bar) return;
     bar.style.display = 'flex';
     var h = '';
+    var activeTab = (route.view === 'view') ? 'goals' : route.view;
     for (var i = 0; i < TABS.length; i++) {
       var t = TABS[i];
-      h += '<button class="tab' + (route.view === t.key ? ' on' : '') + '" data-act="tab" data-tab="' + t.key + '">' +
+      h += '<button class="tab' + (activeTab === t.key ? ' on' : '') + '" data-act="tab" data-tab="' + t.key + '">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="' + t.icon + '"></path></svg>' + esc(t.label) + '</button>';
     }
@@ -304,7 +318,7 @@
 
     h += '<div class="card"><div class="row between"><h2 style="margin:0">目标</h2>' +
       '<button class="btn sm ghost" data-act="seed">载入示例</button></div>' +
-      '<div class="hint">定过的目标都存在这里，点进去可以继续补录。长按目标可以删除。</div>' +
+      '<div class="hint">定过的目标都存在这里。点进去看完整复盘，想改点「编辑」。长按目标可以删除。</div>' +
       '</div>';
 
     if (!goals.length) {
@@ -320,7 +334,7 @@
       var st = blockStatus(g);
       var done = doneCount(st);
       var pending = openActions(g);
-      h += '<div class="proj-card" data-act="open-goal" data-id="' + esc(g.id) + '">' +
+      h += '<div class="proj-card" data-act="view-goal" data-id="' + esc(g.id) + '">' +
         '<div class="row between"><span class="t">' + esc(short(g.goal.description || '未填目标', 26)) + '</span>' +
         '<span class="badge ' + statusBadge(g)[0] + '">' + statusBadge(g)[1] + '</span></div>' +
         '<div class="meta">' + g.goal.criteria.length + ' 条验证标准 · ' + done + '/4 块已填 · 更新于 ' + fmtTime(g.updatedAt) + '</div>' +
@@ -514,10 +528,17 @@
   }
 
   // 原因 / 改进这两行：存完是只读（和目标块一样），点「修改」才回到输入框
-  function factLine(label, item, factId, kind) {
+  // ro=true 时是审阅页的纯展示：没有输入框，也没有「修改」
+  function factLine(label, item, factId, kind, ro) {
     var editing = (kind === 'cause') ? (editCauseFact === factId) : (editActionFact === factId);
     var h = '<div class="fact-ln"><span class="fl-h">' + label + '</span>';
-    if (item && !editing) {
+    if (ro) {
+      if (item) {
+        h += '<div class="fl-ro"><span class="grow">' + esc(item.text || item.title) + '</span></div>';
+      } else {
+        h += '<div class="muted small">—</div>';
+      }
+    } else if (item && !editing) {
       h += '<div class="fl-ro"><span class="grow">' + esc(item.text || item.title) + '</span>' +
         '<button class="btn sm ghost" data-act="edit-' + kind + '" data-fact="' + esc(factId) + '">修改</button></div>';
     } else {
@@ -540,9 +561,7 @@
       h += latestResult;
     }
 
-    var facts = goal.facts.slice().sort(function (a, b) {
-      return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));
-    });
+    var facts = goal.facts.slice().sort(byTimeline);
 
     if (!facts.length) {
       h += '<div class="muted small" style="margin-top:12px">还没有事实。先在上面记一条，才能归因和改进。</div>';
@@ -623,6 +642,88 @@
         (goal.submittedAt ? '回到目标页' : '提交复盘') + '</button>';
     }
 
+    return h;
+  }
+
+  // ---------- 审阅页（只读）：目标 / 结果 / 差距 / 事实时间线 ----------
+  function renderTimelineReadonly(goal) {
+    var facts = goal.facts.slice().sort(byTimeline);
+    if (!facts.length) return '<div class="muted small">还没有事实。</div>';
+    var h = '<div class="timeline">';
+    for (var i = 0; i < facts.length; i++) {
+      var f = facts[i];
+      var cause = causeOfFact(goal, f.id);
+      var action = actionOfFact(goal, f.id);
+      h += '<div class="tl-item">' +
+        '<div class="tl-time">' + esc(f.timelineAt || '未标时间') + '</div>' +
+        '<div class="tl-body">' +
+        '<div class="fact-txt">' + esc(f.content) + '</div>' +
+        factLine('原因', cause, f.id, 'cause', true) +
+        factLine('改进', action, f.id, 'action', true) +
+        (action && action.verifyResult
+          ? '<div class="kv"><b>验证结论：</b>' + esc(action.verifyResult) + '</div>' : '') +
+        '</div></div>';
+    }
+    h += '</div>';
+
+    // 没锚到事实上的历史条目，也别丢
+    var orphanCauses = goal.causes.filter(function (c) { return !c.factId || !factById(goal, c.factId); });
+    var orphanActions = goal.actions.filter(function (a) { return !a.factId || !factById(goal, a.factId); });
+    if (orphanCauses.length || orphanActions.length) {
+      h += '<hr class="sep"><div class="muted small">历史数据：没有对应事实的条目</div>';
+      for (var oc = 0; oc < orphanCauses.length; oc++) {
+        h += '<div class="kv">原因 · ' + esc(orphanCauses[oc].text) + '</div>';
+      }
+      for (var oa = 0; oa < orphanActions.length; oa++) {
+        h += '<div class="kv">改进 · ' + esc(orphanActions[oa].title) + '</div>';
+      }
+    }
+    return h;
+  }
+
+  function renderView(goal) {
+    var h = '';
+    var r = goal.results.length ? goal.results[goal.results.length - 1] : null;
+
+    // 目标
+    h += '<div class="card">' +
+      '<div class="row between" style="margin-bottom:10px"><span class="item-t">目标</span>' +
+      '<button class="btn sm" data-act="edit-review" data-id="' + esc(goal.id) + '">编辑</button></div>' +
+      renderGoalViewBody(goal) + '</div>';
+
+    // 结果
+    h += '<div class="card"><div class="item-t" style="margin-bottom:8px">结果</div>';
+    if (!r) {
+      h += '<div class="muted small">还没有结果。</div>';
+    } else {
+      h += '<div class="kv" style="white-space:pre-wrap">' + esc(r.actual || '（未填写）') + '</div>' +
+        '<div class="muted small" style="margin-top:4px">' + fmtTime(r.createdAt) + ' 提交</div>';
+    }
+    h += '</div>';
+
+    // 差距
+    h += '<div class="card"><div class="item-t" style="margin-bottom:8px">差距</div>';
+    if (!r || (!r.gap && !(r.metrics && r.metrics.length))) {
+      h += '<div class="muted small">没有记录差距。</div>';
+    } else {
+      if (r.metrics && r.metrics.length) {
+        h += '<table class="tbl"><tr><th>指标</th><th>实际</th><th>目标</th></tr>';
+        for (var m = 0; m < r.metrics.length; m++) {
+          h += '<tr><td>' + esc(r.metrics[m].name) + '</td><td>' + esc(r.metrics[m].value) +
+            '</td><td>' + esc(r.metrics[m].target) + '</td></tr>';
+        }
+        h += '</table>';
+      }
+      if (r.gap) h += '<div class="kv" style="margin-top:6px"><b>目标差距：</b>' + esc(r.gap) + '</div>';
+    }
+    h += '</div>';
+
+    // 事实时间线
+    h += '<div class="card"><div class="item-t" style="margin-bottom:8px">事实（' + goal.facts.length + '）</div>' +
+      renderTimelineReadonly(goal) + '</div>';
+
+    h += '<button class="btn primary block" data-act="edit-review" data-id="' + esc(goal.id) +
+      '" style="margin-top:16px">编辑这个目标</button>';
     return h;
   }
 
@@ -760,6 +861,23 @@
       editCauseFact = null;
       editActionFact = null;
       view.innerHTML = renderStats();
+      renderTabbar();
+      return;
+    }
+
+    // ---- 审阅页（只读）----
+    if (route.view === 'view') {
+      editingGoal = false;
+      editCauseFact = null;
+      editActionFact = null;
+      var vg = store.getGoal(route.id);
+      if (!vg) {
+        view.innerHTML = '<div class="empty"><div class="e-t">目标不存在</div>' +
+          '<button class="btn primary" style="margin-top:12px" data-act="back">返回目标列表</button></div>';
+        renderTabbar();
+        return;
+      }
+      view.innerHTML = renderView(vg);
       renderTabbar();
       return;
     }
@@ -1027,8 +1145,12 @@
         }
         return;
       }
-      if (actEl === 'open-goal') {
-        go('#/review/' + id);
+      if (actEl === 'view-goal') {
+        go('#/view/' + id);
+        return;
+      }
+      if (actEl === 'edit-review') {
+        go('#/review/' + (id || route.id));
         return;
       }
       if (actEl === 'delete-goal-now') {

@@ -106,6 +106,7 @@ def run(d):
         ("#/goals", "目标页"),
         ("#/review/new", "复盘页(新建)"),
         ("#/review/demo-current-clip", "复盘页(四块)"),
+        ("#/view/demo-current-clip", "审阅页(只读)"),
         ("#/stats", "统计页"),
         # 旧目标的数据，用来压复盘页与对比面板
         ("#/review/demo-prev-template", "复盘页(旧目标)"),

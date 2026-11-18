@@ -111,7 +111,7 @@ def run(d):
       for (var i=0;i<tabs.length;i++) labels.push(tabs[i].textContent.trim());
       var v = document.getElementById('view');
       return {labels: labels, hasNew: !!v.querySelector('[data-act=new-goal]'),
-              cards: v.querySelectorAll('[data-act=open-goal]').length,
+              cards: v.querySelectorAll('[data-act=view-goal]').length,
               text: v.textContent};
     """)
     check("底部只有三个横向页签", nav["labels"] == ["目标", "复盘", "统计"], str(nav["labels"]))
@@ -144,12 +144,60 @@ def run(d):
           "还没有事实" in fresh.get("tip", ""), str(fresh.get("tip", "")))
     check("目标没建好时不显示提交按钮", not fresh["hasSubmit"], str(fresh["hasSubmit"]))
 
-    # 点目标页的卡片 → 打开那个目标的四块
+    # 点目标页的卡片 → 只读审阅页
     d.execute("location.hash = '#/goals'; return true;")
     time.sleep(0.4)
-    d.execute("document.querySelector('[data-act=open-goal]').click(); return true;")
+    d.execute("document.querySelector('[data-act=view-goal]').click(); return true;")
     time.sleep(0.6)
     opened = d.execute("""
+      var v = document.getElementById('view');
+      var titles = [];
+      var ts = v.querySelectorAll('.card .item-t');
+      for (var i=0;i<ts.length;i++) titles.push(ts[i].textContent.trim());
+      function after(a, c) {
+        if (!a || !c) return 0;
+        return (a.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) ? 1 : 0;
+      }
+      var cards = v.querySelectorAll('.card');
+      var cGoal = null, cResult = null, cGap = null, cFact = null;
+      for (var j=0;j<cards.length;j++){
+        var t = cards[j].querySelector('.item-t');
+        if (!t) continue;
+        var lab = t.textContent.trim();
+        if (lab === '目标') cGoal = cards[j];
+        else if (lab === '结果') cResult = cards[j];
+        else if (lab === '差距') cGap = cards[j];
+        else if (lab.indexOf('事实') === 0) cFact = cards[j];
+      }
+      return {hash: location.hash, titles: titles,
+              goalFirst: !!cGoal && after(v.querySelector('.card'), cGoal) === 1,
+              order: after(cResult, cGap) && after(cGap, cFact),
+              hasTimeline: !!(cFact && cFact.querySelector('.timeline')),
+              factRows: v.querySelectorAll('.fact-ln').length,
+              editable: !!v.querySelector('#g-desc') || !!v.querySelector('#r-actual')
+                        || !!v.querySelector('#f-content') || !!v.querySelector('.cause-in')
+                        || !!v.querySelector('[data-act=save-cause]')
+                        || !!v.querySelector('[data-act=del-fact]'),
+              hasEdit: !!v.querySelector('[data-act=edit-review]'),
+              text: v.textContent};
+    """)
+    check("点目标页卡片进入审阅页", opened["hash"].startswith("#/view/"), opened["hash"])
+    check("审阅页依次列出 目标/结果/差距/事实",
+          opened["order"] == 1, str(opened["titles"]))
+    check("审阅页有事实时间线", opened["hasTimeline"], str(opened))
+    check("审阅页带出原因与改进", opened["factRows"] >= 2, str(opened))
+    check("审阅页完全只读，没有输入框和写操作",
+          not opened["editable"], str(opened))
+    check("审阅页有「编辑」入口", opened["hasEdit"], str(opened))
+
+    # 点「编辑」→ 进入复盘页
+    d.execute("""
+      var b = document.querySelector('[data-act=edit-review]');
+      if (b) b.click();
+      return true;
+    """)
+    time.sleep(0.6)
+    editing = d.execute("""
       var v = document.getElementById('view');
       var heads = [];
       var hs = v.querySelectorAll('.blk-h h2');
@@ -157,17 +205,15 @@ def run(d):
       return {hash: location.hash, heads: heads,
               hasResult: !!document.getElementById('r-actual'),
               hasFact: !!document.getElementById('f-content'),
-              factRows: v.querySelectorAll('.fact-ln').length,
               hasSubmit: !!v.querySelector('[data-act=submit-review]'),
               steps: v.querySelectorAll('.bstrip .badge').length};
     """)
-    check("从目标页能打开某个目标", opened["hash"].startswith("#/review/"), opened["hash"])
+    check("点「编辑」进入复盘页", editing["hash"].startswith("#/review/"), editing["hash"])
     check("复盘页纵向四块：目标/结果/事实/原因与改进",
-          opened["heads"] == ["目标", "结果", "事实", "原因与改进"], str(opened["heads"]))
-    check("四块的内容区都在", opened["hasResult"] and opened["hasFact"]
-          and opened["factRows"] >= 2, str(opened))
-    check("有四步进度条", opened["steps"] == 4, str(opened["steps"]))
-    check("已有目标可以提交复盘", opened["hasSubmit"], str(opened["hasSubmit"]))
+          editing["heads"] == ["目标", "结果", "事实", "原因与改进"], str(editing["heads"]))
+    check("复盘页四块的内容区都在", editing["hasResult"] and editing["hasFact"], str(editing))
+    check("有四步进度条", editing["steps"] == 4, str(editing["steps"]))
+    check("已有目标可以提交复盘", editing["hasSubmit"], str(editing["hasSubmit"]))
 
     # ---------- B. 目标块：两栏，填好即可创建 ----------
     print("\n[B] 目标块：两栏，填好即可创建")
