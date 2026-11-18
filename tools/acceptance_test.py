@@ -161,51 +161,53 @@ def run(d):
     time.sleep(0.6)
     opened = d.execute("""
       var v = document.getElementById('view');
-      var titles = [];
-      var ts = v.querySelectorAll('.card .item-t');
-      for (var i=0;i<ts.length;i++) titles.push(ts[i].textContent.trim());
-      function after(a, c) {
-        if (!a || !c) return 0;
-        return (a.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) ? 1 : 0;
-      }
-      var cards = v.querySelectorAll('.card');
-      var cGoal = null, cResult = null, cGap = null, cFact = null;
-      for (var j=0;j<cards.length;j++){
-        var t = cards[j].querySelector('.item-t');
-        if (!t) continue;
-        var lab = t.textContent.trim();
-        if (lab === '目标') cGoal = cards[j];
-        else if (lab === '结果') cResult = cards[j];
-        else if (lab === '差距') cGap = cards[j];
-        else if (lab.indexOf('事实') === 0) cFact = cards[j];
-      }
-      return {hash: location.hash, titles: titles,
-              goalFirst: !!cGoal && after(v.querySelector('.card'), cGoal) === 1,
-              order: after(cResult, cGap) && after(cGap, cFact),
-              hasTimeline: !!(cFact && cFact.querySelector('.timeline')),
-              factRows: v.querySelectorAll('.fact-ln').length,
+      var bar = document.getElementById('appbar');
+      var mods = [];
+      var ms = v.querySelectorAll('.mdl-h');
+      for (var i=0;i<ms.length;i++) mods.push(ms[i].textContent.trim());
+      var firstBtn = bar.querySelector('button');
+      return {hash: location.hash, mods: mods,
+              hasTable: !!v.querySelector('table'),
+              hasTimeline: !!v.querySelector('.timeline'),
+              items: v.querySelectorAll('.tl-item').length,
+              expLines: v.querySelectorAll('.exp-ln').length,
+              hasGood: v.textContent.indexOf('🟢') >= 0,
+              hasBad: v.textContent.indexOf('🔴') >= 0,
+              hasSlot: v.textContent.indexOf('+ 锻造新装备') >= 0,
+              hasExpect: v.textContent.indexOf('💡 预期') >= 0,
+              hasReal: v.textContent.indexOf('⚠️ 现实') >= 0,
+              hasGap: v.textContent.indexOf('🔴 差距') >= 0,
               editable: !!v.querySelector('#g-desc') || !!v.querySelector('#r-actual')
                         || !!v.querySelector('#f-content') || !!v.querySelector('.cause-in')
                         || !!v.querySelector('[data-act=save-cause]')
-                        || !!v.querySelector('[data-act=del-fact]'),
-              hasEdit: !!v.querySelector('[data-act=edit-review]'),
-              barEdit: !!document.getElementById('appbar').querySelector('[data-act=edit-review]'),
-              barBack: !!document.getElementById('appbar').querySelector('[data-act=back]'),
+                        || !!v.querySelector('[data-act=del-fact]')
+                        || !!v.querySelector('table'),
+              barTitle: bar.querySelector('.title').textContent.trim(),
+              barLeft: firstBtn ? firstBtn.textContent.trim() : '',
+              barEdit: !!bar.querySelector('[data-act=edit-review]'),
+              barExport: !!bar.querySelector('[data-act=open-export]'),
+              barBack: !!bar.querySelector('[data-act=back]'),
               tabHidden: getComputedStyle(document.getElementById('tabbar')).display === 'none',
               bodyPad: parseFloat(getComputedStyle(document.body).paddingBottom) || 0,
               text: v.textContent};
     """)
-    check("点目标页卡片进入审阅页", opened["hash"].startswith("#/view/"), opened["hash"])
-    check("审阅页依次列出 目标/结果/差距/事实",
-          opened["order"] == 1, str(opened["titles"]))
-    check("审阅页有事实时间线", opened["hasTimeline"], str(opened))
-    check("审阅页带出原因与改进", opened["factRows"] >= 2, str(opened))
-    check("审阅页完全只读，没有输入框和写操作",
+    check("点目标页卡片进入战报回放页", opened["hash"].startswith("#/view/"), opened["hash"])
+    check("只有两个模块：预期 vs 现实 / 经验流",
+          opened["mods"] == ["📦 预期 vs 现实", "📦 经验流"], str(opened["mods"]))
+    check("顶栏是 返回 / 战报回放 / 编辑+导出",
+          opened["barLeft"] == "返回" and "战报回放" in opened["barTitle"]
+          and opened["barEdit"] and opened["barExport"], str(opened))
+    check("模块一含 预期/现实/差距",
+          opened["hasExpect"] and opened["hasReal"] and opened["hasGap"], str(opened))
+    check("表格已去掉", not opened["hasTable"], str(opened))
+    check("模块二按时间线排布", opened["hasTimeline"], str(opened))
+    check("每条事实带原因与装备两行",
+          opened["items"] > 0 and opened["expLines"] == opened["items"] * 2, str(opened))
+    check("事实有正负标记", opened["hasGood"] and opened["hasBad"], str(opened))
+    check("没改进的地方留了空位", opened["hasSlot"], str(opened))
+    check("战报回放页完全只读，没有输入框和写操作",
           not opened["editable"], str(opened))
-    check("审阅页内容里不再有编辑按钮", not opened["hasEdit"], str(opened))
-    check("审阅页顶部有「编辑」和「返回」",
-          opened["barEdit"] and opened["barBack"], str(opened))
-    check("审阅页铺满到底，导航栏不占位",
+    check("战报回放页铺满到底，导航栏不占位",
           opened["tabHidden"] and opened["bodyPad"] <= 1, str(opened))
 
     # 点顶部「编辑」→ 进入复盘页

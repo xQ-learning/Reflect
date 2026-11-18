@@ -236,14 +236,18 @@
     var title = 'Reflect';
     var sub = '<span class="sub">把差距变成下一次的动作</span>';
     var right = '';
+    var left = logo;
 
     if (route.view === 'view') {
-      title = '审阅';
+      title = '【 战报回放 】';
       sub = '';
+      left = '<button class="btn sm ghost" data-act="back">返回</button>';
       var vg = store.getGoal(route.id);
       if (vg) {
         right = '<button class="btn sm" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑</button>' +
-          '<button class="btn sm ghost" data-act="back">返回</button>';
+          '<button class="iconbtn" data-act="open-export" aria-label="导出分享">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M12 3v10m0 0l-4-4m4 4l4-4M4 17v4h16v-4"></path></svg></button>';
       }
     } else if (route.view === 'review') {
       title = '复盘';
@@ -260,7 +264,7 @@
       sub = '';
     }
 
-    bar.innerHTML = logo + '<div class="title">' + title + sub + '</div>' + right;
+    bar.innerHTML = left + '<div class="title">' + title + sub + '</div>' + right;
   }
 
   // ---------- 底部 Tab ----------
@@ -320,7 +324,7 @@
     var h = '';
 
     h += '<div class="card"><h2 style="margin:0">目标</h2>' +
-      '<div class="hint">定过的目标都存在这里。点进去看完整复盘，想改点「编辑」。长按目标可以删除。</div>' +
+      '<div class="hint">定过的目标都存在这里。点进去看战报回放，想改点「编辑」。长按目标可以删除。</div>' +
       '</div>';
 
     if (!goals.length) {
@@ -647,8 +651,31 @@
     return h;
   }
 
-  // ---------- 审阅页（只读）：目标 / 结果 / 差距 / 事实时间线 ----------
-  function renderTimelineReadonly(goal) {
+  // ---------- 战报回放（只读）：预期 vs 现实 + 经验流 ----------
+  // 事实的颜色：文本里带正向词就算好消息
+  var GOOD_WORDS = ['爽', '成功', '顺利', '满意', '喜欢', '不错', '顺畅', '提升', '省时', '省心'];
+
+  function isGoodFact(text) {
+    var t = String(text || '');
+    for (var i = 0; i < GOOD_WORDS.length; i++) {
+      if (t.indexOf(GOOD_WORDS[i]) >= 0) return true;
+    }
+    return false;
+  }
+
+  // 2026-11-16 14:30 → 11-16 14:30
+  function shortTime(s) {
+    var m = String(s || '').match(/^\d{4}-(\d{2}-\d{2})(.*)$/);
+    return m ? m[1] + m[2] : String(s || '');
+  }
+
+  function actionStatusText(ac) {
+    if (!ac) return '';
+    return ac.status === 'verified' ? '已闭环' : ac.status === 'failed' ? '未生效' : '待验证';
+  }
+
+  // 模块 2：经验流（事实 + 原因 + 改进，按时间线排）
+  function renderExpFlow(goal) {
     var facts = goal.facts.slice().sort(byTimeline);
     if (!facts.length) return '<div class="muted small">还没有事实。</div>';
     var h = '<div class="timeline">';
@@ -657,72 +684,78 @@
       var cause = causeOfFact(goal, f.id);
       var action = actionOfFact(goal, f.id);
       h += '<div class="tl-item">' +
-        '<div class="tl-time">' + esc(f.timelineAt || '未标时间') + '</div>' +
+        '<div class="tl-time">🕒 ' + esc(shortTime(f.timelineAt) || '未标时间') + '</div>' +
         '<div class="tl-body">' +
-        '<div class="fact-txt">' + esc(f.content) + '</div>' +
-        factLine('原因', cause, f.id, 'cause', true) +
-        factLine('改进', action, f.id, 'action', true) +
-        (action && action.verifyResult
-          ? '<div class="kv"><b>验证结论：</b>' + esc(action.verifyResult) + '</div>' : '') +
+        '<div class="fact-txt">' + (isGoodFact(f.content) ? '🟢 ' : '🔴 ') + esc(f.content) + '</div>' +
+        '<div class="exp-ln"><span class="exp-k">🔍 原因</span>' +
+        '<div class="exp-v">' +
+        (cause ? esc(cause.text) : '<span class="muted">—</span>') + '</div></div>' +
+        '<div class="exp-ln"><span class="exp-k">🛠️ 装备</span>' +
+        '<div class="exp-v">' + (action
+          ? esc(action.title) + ' <span class="exp-st">' + actionStatusText(action) + '</span>' +
+            (action.verifyResult
+              ? '<div class="muted small">验证结论：' + esc(action.verifyResult) + '</div>' +
+                '<div class="muted small">' + fmtTime(action.closedAt) + ' 闭环</div>'
+              : '')
+          : '<button class="add-eq" data-act="edit-review">+ 锻造新装备</button>') + '</div></div>' +
         '</div></div>';
     }
     h += '</div>';
-
-    // 没锚到事实上的历史条目，也别丢
-    var orphanCauses = goal.causes.filter(function (c) { return !c.factId || !factById(goal, c.factId); });
-    var orphanActions = goal.actions.filter(function (a) { return !a.factId || !factById(goal, a.factId); });
-    if (orphanCauses.length || orphanActions.length) {
-      h += '<hr class="sep"><div class="muted small">历史数据：没有对应事实的条目</div>';
-      for (var oc = 0; oc < orphanCauses.length; oc++) {
-        h += '<div class="kv">原因 · ' + esc(orphanCauses[oc].text) + '</div>';
-      }
-      for (var oa = 0; oa < orphanActions.length; oa++) {
-        h += '<div class="kv">改进 · ' + esc(orphanActions[oa].title) + '</div>';
-      }
-    }
     return h;
   }
 
-  function renderView(goal) {
-    var h = '';
+  // 模块 1：预期 vs 现实（目标 + 结果合成）
+  function renderExpectVsReal(goal) {
     var r = goal.results.length ? goal.results[goal.results.length - 1] : null;
+    var badge = statusBadge(goal);
+    var h = '<div class="card dark">' +
+      '<div class="mdl-h">📦 预期 vs 现实</div>' +
+      '<div class="row between" style="align-items:flex-start;gap:8px">' +
+      '<div class="goal-t">🎯 ' + esc(goal.goal.description || '（未填目标）') + '</div>' +
+      '<span class="badge ' + badge[0] + '">' + badge[1] + '</span></div>';
 
-    // 目标
-    h += '<div class="card">' +
-      '<div class="row between" style="margin-bottom:10px"><span class="item-t">目标</span></div>' +
-      renderGoalViewBody(goal) + '</div>';
-
-    // 结果
-    h += '<div class="card"><div class="item-t" style="margin-bottom:8px">结果</div>';
-    if (!r) {
-      h += '<div class="muted small">还没有结果。</div>';
+    // 预期
+    h += '<div class="cmp"><div class="cmp-k">💡 预期</div><div class="cmp-v">';
+    if (goal.goal.criteria.length) {
+      for (var i = 0; i < goal.goal.criteria.length; i++) {
+        h += '<div class="cmp-line good">· ' + esc(goal.goal.criteria[i]) + '</div>';
+      }
     } else {
-      h += '<div class="kv" style="white-space:pre-wrap">' + esc(r.actual || '（未填写）') + '</div>' +
-        '<div class="muted small" style="margin-top:4px">' + fmtTime(r.createdAt) + ' 提交</div>';
+      h += '<div class="cmp-line muted">（没写验证标准）</div>';
     }
-    h += '</div>';
+    h += '</div></div>';
+
+    // 现实
+    h += '<div class="cmp"><div class="cmp-k">⚠️ 现实</div><div class="cmp-v">';
+    if (r) {
+      h += '<div class="cmp-line">' + esc(r.actual || '（未填写）') + '</div>';
+      if (r.metrics && r.metrics.length) {
+        for (var m = 0; m < r.metrics.length; m++) {
+          h += '<div class="cmp-line metric"><b class="bad">' + esc(r.metrics[m].name) + ' ' + esc(r.metrics[m].value) +
+            '</b><span class="sep">/</span><span class="muted small">目标</span> <b class="good">' + esc(r.metrics[m].target) + '</b></div>';
+        }
+      }
+      h += '<div class="muted small" style="margin-top:4px">' + fmtTime(r.createdAt) + ' 提交</div>';
+    } else {
+      h += '<div class="cmp-line muted">（还没有结果）</div>';
+    }
+    h += '</div></div>';
 
     // 差距
-    h += '<div class="card"><div class="item-t" style="margin-bottom:8px">差距</div>';
-    if (!r || (!r.gap && !(r.metrics && r.metrics.length))) {
-      h += '<div class="muted small">没有记录差距。</div>';
+    h += '<div class="cmp"><div class="cmp-k">🔴 差距</div><div class="cmp-v">';
+    if (r && r.gap) {
+      h += '<div class="cmp-line bad">' + esc(r.gap) + '</div>';
     } else {
-      if (r.metrics && r.metrics.length) {
-        h += '<table class="tbl"><tr><th>指标</th><th>实际</th><th>目标</th></tr>';
-        for (var m = 0; m < r.metrics.length; m++) {
-          h += '<tr><td>' + esc(r.metrics[m].name) + '</td><td>' + esc(r.metrics[m].value) +
-            '</td><td>' + esc(r.metrics[m].target) + '</td></tr>';
-        }
-        h += '</table>';
-      }
-      if (r.gap) h += '<div class="kv" style="margin-top:6px"><b>目标差距：</b>' + esc(r.gap) + '</div>';
+      h += '<div class="cmp-line muted">（还没记差距）</div>';
     }
-    h += '</div>';
+    h += '</div></div></div>';
+    return h;
+  }
 
-    // 事实时间线
-    h += '<div class="card"><div class="item-t" style="margin-bottom:8px">事实（' + goal.facts.length + '）</div>' +
-      renderTimelineReadonly(goal) + '</div>';
-
+  function renderBattle(goal) {
+    var h = '';
+    h += renderExpectVsReal(goal);
+    h += '<div class="card"><div class="mdl-h">📦 经验流</div>' + renderExpFlow(goal) + '</div>';
     return h;
   }
 
@@ -881,7 +914,7 @@
         renderTabbar();
         return;
       }
-      view.innerHTML = renderView(vg);
+      view.innerHTML = renderBattle(vg);
       renderTabbar();
       return;
     }
