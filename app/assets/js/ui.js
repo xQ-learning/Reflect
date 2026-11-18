@@ -403,10 +403,10 @@
     var h = '';
     h += '<label class="field"><span>实际结果</span>' +
       '<textarea id="r-actual" placeholder="例：5 人中 3 人完成，导出失败率 12%"></textarea></label>' +
-      '<div id="r-metrics"></div>' +
-      '<button class="btn sm" data-act="add-metric" style="margin-bottom:10px">+ 添加关键指标</button>' +
       '<label class="field"><span>目标差距</span>' +
       '<textarea id="r-gap" placeholder="例：完成率差 20 个百分点"></textarea></label>' +
+      '<div id="r-metrics"></div>' +
+      '<button class="btn sm" data-act="add-metric" style="margin-bottom:10px">+ 添加关键指标</button>' +
       '<button class="btn primary block" data-act="add-result">提交结果</button>';
 
     if (!goal.results.length) {
@@ -414,32 +414,53 @@
       return h;
     }
 
-    h += '<hr class="sep">';
-    for (var i = 0; i < goal.results.length; i++) {
-      var r = goal.results[i];
-      var latest = i === goal.results.length - 1;
-      h += '<div class="item">' +
-        '<div class="row between"><span class="item-t">' + (latest ? '最新提交' : '历史提交') + '</span>' +
-        '<span class="muted small">' + fmtTime(r.createdAt) + '</span></div>' +
-        '<div class="kv" style="white-space:pre-wrap">' + esc(r.actual || '（未填写）') + '</div>';
-      if (r.metrics && r.metrics.length) {
-        h += '<table class="tbl" style="margin-top:8px"><tr><th>指标</th><th>实际</th><th>目标</th></tr>';
-        for (var m = 0; m < r.metrics.length; m++) {
-          h += '<tr><td>' + esc(r.metrics[m].name) + '</td><td>' + esc(r.metrics[m].value) + '</td><td>' + esc(r.metrics[m].target) + '</td></tr>';
-        }
-        h += '</table>';
-      }
-      if (r.gap) h += '<div class="kv"><b>目标差距：</b>' + esc(r.gap) + '</div>';
-      if (!latest) {
-        h += '<div class="row end" style="margin-top:8px">' +
-          '<button class="btn sm" data-act="merge-result" data-id="' + esc(r.id) + '">以此条为准</button></div>';
-      }
-      h += '</div>';
-    }
+    // 最新一条搬到「原因与改进」块，这里只留历史提交
     if (goal.results.length > 1) {
+      h += '<hr class="sep">';
+      h += '<div class="muted small">历史提交（最新一条见下面的「原因与改进」）</div>';
+      for (var i = 0; i < goal.results.length - 1; i++) {
+        var r = goal.results[i];
+        h += '<div class="item">' +
+          '<div class="row between"><span class="item-t">历史提交</span>' +
+          '<span class="muted small">' + fmtTime(r.createdAt) + '</span></div>' +
+          '<div class="kv" style="white-space:pre-wrap">' + esc(r.actual || '（未填写）') + '</div>';
+        if (r.metrics && r.metrics.length) {
+          h += '<table class="tbl" style="margin-top:8px"><tr><th>指标</th><th>实际</th><th>目标</th></tr>';
+          for (var m = 0; m < r.metrics.length; m++) {
+            h += '<tr><td>' + esc(r.metrics[m].name) + '</td><td>' + esc(r.metrics[m].value) + '</td><td>' + esc(r.metrics[m].target) + '</td></tr>';
+          }
+          h += '</table>';
+        }
+        if (r.gap) h += '<div class="kv"><b>目标差距：</b>' + esc(r.gap) + '</div>';
+        h += '<div class="row end" style="margin-top:8px">' +
+          '<button class="btn sm" data-act="merge-result" data-id="' + esc(r.id) + '">以此条为准</button></div>' +
+          '</div>';
+      }
       h += '<div class="alert-box">存在 ' + goal.results.length + ' 条提交。导出报告以最新一条为准；' +
         '若需以其它提交为准，点对应记录上的「以此条为准」。</div>';
+    } else {
+      h += '<div class="muted small" style="margin-top:12px">最新一条结果显示在下面的「原因与改进」里，方便对着差距归因。</div>';
     }
+    return h;
+  }
+
+  // 最新的结果（差距汇总）：放在「原因与改进」块的时间线上面
+  function renderLatestResult(goal) {
+    if (!goal.results.length) return '';
+    var r = goal.results[goal.results.length - 1];
+    var h = '<div class="item">' +
+      '<div class="row between"><span class="item-t">最新提交</span>' +
+      '<span class="muted small">' + fmtTime(r.createdAt) + '</span></div>' +
+      '<div class="kv" style="white-space:pre-wrap">' + esc(r.actual || '（未填写）') + '</div>';
+    if (r.metrics && r.metrics.length) {
+      h += '<table class="tbl" style="margin-top:8px"><tr><th>指标</th><th>实际</th><th>目标</th></tr>';
+      for (var m = 0; m < r.metrics.length; m++) {
+        h += '<tr><td>' + esc(r.metrics[m].name) + '</td><td>' + esc(r.metrics[m].value) + '</td><td>' + esc(r.metrics[m].target) + '</td></tr>';
+      }
+      h += '</table>';
+    }
+    if (r.gap) h += '<div class="kv"><b>目标差距：</b>' + esc(r.gap) + '</div>';
+    h += '</div>';
     return h;
   }
 
@@ -512,8 +533,12 @@
 
   function renderCausesBody(goal) {
     var h = '';
-    h += '<div class="hint">在每条事实下面写它的原因和改进。写下原因，并关联到具体事实；写下要做的事就行。' +
-      '验证可以留到以后补——它常常要等一个周期，甚至在别的目标里才闭环。</div>';
+    h += '<div class="hint">在每条事实下面写它的原因和改进。</div>';
+    var latestResult = renderLatestResult(goal);
+    if (latestResult) {
+      h += '<div class="muted small" style="margin-top:12px">差距汇总</div>';
+      h += latestResult;
+    }
 
     var facts = goal.facts.slice().sort(function (a, b) {
       return String(a.timelineAt || '').localeCompare(String(b.timelineAt || ''));

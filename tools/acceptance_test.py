@@ -323,13 +323,27 @@ def run(d):
     result = d.execute("""
       var v = document.getElementById('view');
       var b = window.__block('结果');
+      var gap = b.querySelector('#r-gap');
+      var met = b.querySelector('#r-metrics');
+      var btn = b.querySelector('[data-act=add-metric]');
+      function after(a, c) {
+        if (!a || !c) return 0;
+        return (a.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) ? 1 : 0;
+      }
       return {hasAuthor: !!b.querySelector('#r-author'), text: b.textContent,
               hasActual: !!b.querySelector('#r-actual'),
-              hasGap: !!b.querySelector('#r-gap')};
+              hasGap: !!gap,
+              hasMetrics: !!met, hasMetricBtn: !!btn,
+              metricsAfterGap: after(gap, met),
+              btnAfterGap: after(gap, btn),
+              hasLatest: b.textContent.indexOf('最新提交') >= 0};
     """)
     check("结果块无提交人", not result["hasAuthor"] and "提交人" not in result["text"], str(result))
     check("结果块保留实际结果与目标差距",
           result["hasActual"] and result["hasGap"], str(result))
+    check("关键指标下移到目标差距下面",
+          result["metricsAfterGap"] == 1 and result["btnAfterGap"] == 1, str(result))
+    check("结果块不再显示「最新提交」", not result["hasLatest"], str(result))
 
     facts = d.execute("""
       var b = window.__block('事实');
@@ -383,6 +397,27 @@ def run(d):
     check("原因与改进块有引导说明",
           "写它的原因" in causes["text"] or "原因和改进" in causes["text"], causes["text"][:120])
     check("不再显示改进状态", "改进状态" not in causes["text"], causes["text"][:200])
+
+    gap_sum = d.execute("""
+      var b = window.__block('原因与改进');
+      var tl = b.querySelector('.timeline');
+      var item = b.querySelector('.item');
+      var hint = b.querySelector('.hint');
+      function before(a, c) {
+        if (!a || !c) return 0;
+        return (a.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) ? 1 : 0;
+      }
+      return {hasLabel: b.textContent.indexOf('差距汇总') >= 0,
+              hasLatest: b.textContent.indexOf('最新提交') >= 0,
+              hasGapText: b.textContent.indexOf('完成率差 20 个百分点') >= 0,
+              beforeTimeline: before(item, tl),
+              hint: hint ? hint.textContent : '',
+              sentences: hint ? (hint.textContent.match(/。/g) || []).length : 0};
+    """)
+    check("原因与改进块顶上出现差距汇总",
+          gap_sum["hasLabel"] and gap_sum["hasLatest"] and gap_sum["hasGapText"], str(gap_sum))
+    check("差距汇总排在时间线上面", gap_sum["beforeTimeline"] == 1, str(gap_sum))
+    check("原因与改进的说明只剩一句话", gap_sum["sentences"] == 1, str(gap_sum))
     check("没有独立的「添加原因」表单和关联事实选择器",
           not causes["hasStandaloneCause"] and not causes["hasFactPicker"]
           and not causes["hasStandaloneAction"], str(causes))
