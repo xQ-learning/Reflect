@@ -251,6 +251,21 @@ select { appearance: none; background-image: none; }
 
 .proj-card:active { background: var(--card-2); }
 .proj-card .t { font-weight: 600; font-size: 16px; }
+.proj-card .kpi {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.proj-card .gear {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--warn);
+  font-weight: 600;
+}
+.proj-card .gear.muted { color: var(--muted); font-weight: 500; }
+.proj-card .gear-wait { color: var(--warn); }
+.proj-card .gear-ok { color: var(--ok); }
 .proj-card .meta { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
 
 .progress {
@@ -532,20 +547,23 @@ table.tbl th { color: var(--muted); font-weight: 500; background: var(--bg-soft)
 .exp-k { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .exp-v { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .exp-st { font-size: 12px; color: var(--muted); }
-.add-eq {
+/* 战报回放顶栏：无边框的纯文字操作 */
+.bar-back, .bar-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
   min-height: var(--tap);
-  padding: 4px 12px;
-  border: 1px dashed rgba(77, 141, 250, .55);
-  border-radius: 9px;
+  padding: 0 6px;
+  border: none;
   background: transparent;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
 }
-.add-eq:hover { background: rgba(77, 141, 250, .10); }
+.bar-back { font-size: 22px; color: var(--muted); }
+.bar-back:hover, .bar-link:hover { color: var(--accent); }
 
 /* ---------- 复盘页：四块 ---------- */
 .blk-h {

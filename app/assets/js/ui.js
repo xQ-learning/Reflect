@@ -241,13 +241,10 @@
     if (route.view === 'view') {
       title = '【 战报回放 】';
       sub = '';
-      left = '<button class="btn sm ghost" data-act="back">返回</button>';
+      left = '<button class="bar-back" data-act="back" aria-label="返回">&lt;</button>';
       var vg = store.getGoal(route.id);
       if (vg) {
-        right = '<button class="btn sm" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑</button>' +
-          '<button class="iconbtn" data-act="open-export" aria-label="导出分享">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M12 3v10m0 0l-4-4m4 4l4-4M4 17v4h16v-4"></path></svg></button>';
+        right = '<button class="bar-link" data-act="edit-review" data-id="' + esc(vg.id) + '">编辑</button>';
       }
     } else if (route.view === 'review') {
       title = '复盘';
@@ -323,7 +320,7 @@
     var goals = store.getGoals().slice().sort(byUpdatedDesc);
     var h = '';
 
-    h += '<div class="card"><h2 style="margin:0">目标</h2>' +
+    h += '<div class="card"><h2 style="margin:0">目标集</h2>' +
       '<div class="hint">定过的目标都存在这里。点进去看战报回放，想改点「编辑」。长按目标可以删除。</div>' +
       '</div>';
 
@@ -334,21 +331,42 @@
       return h;
     }
 
-    h += '<h1 class="page-title">全部目标（' + goals.length + '）</h1>';
+    h += '<h1 class="page-title">目标集（' + goals.length + '）</h1>';
     for (var i = 0; i < goals.length; i++) {
       var g = goals[i];
-      var st = blockStatus(g);
-      var done = doneCount(st);
-      var pending = openActions(g);
       h += '<div class="proj-card" data-act="view-goal" data-id="' + esc(g.id) + '">' +
-        '<div class="row between"><span class="t">' + esc(short(g.goal.description || '未填目标', 26)) + '</span>' +
+        '<div class="row between"><span class="t">💥 ' + esc(short(g.goal.description || '未填目标', 22)) + '</span>' +
         '<span class="badge ' + statusBadge(g)[0] + '">' + statusBadge(g)[1] + '</span></div>' +
-        '<div class="meta">' + g.goal.criteria.length + ' 条验证标准 · ' + done + '/4 块已填 · 更新于 ' + fmtTime(g.updatedAt) + '</div>' +
-        '<div class="progress"><i style="width:' + Math.round(done / 4 * 100) + '%"></i></div>' +
-        (pending.length ? '<div class="meta" style="color:var(--warn)">' + pending.length + ' 条改进还没验证</div>' : '') +
+        metricsLine(g) +
+        gearLine(g) +
+        '<div class="meta">' + g.goal.criteria.length + ' 条验证标准 · 更新于 ' + fmtTime(g.updatedAt) + '</div>' +
         '</div>';
     }
     return h;
+  }
+
+  // 目标卡片上的核心数据：最新一条结果的指标
+  function metricsLine(g) {
+    var r = g.results.length ? g.results[g.results.length - 1] : null;
+    if (!r) return '<div class="meta">还没有结果</div>';
+    var parts = [];
+    if (r.metrics) {
+      for (var i = 0; i < r.metrics.length; i++) {
+        parts.push(esc(r.metrics[i].name) + ' ' + esc(r.metrics[i].value));
+      }
+    }
+    if (!parts.length) parts.push(esc(short(r.actual || '（未填写）', 22)));
+    return '<div class="kpi">' + parts.join(' · ') + '</div>';
+  }
+
+  // 目标卡片上的掉落感：掉了几件装备，还有几件没验证
+  function gearLine(g) {
+    var total = g.actions.length;
+    var pending = g.actions.filter(function (a) { return a.status !== 'verified'; }).length;
+    if (!total) return '<div class="gear muted">🔥 还没掉落装备</div>';
+    return '<div class="gear">🔥 已掉落 ' + total + ' 件装备' +
+      (pending ? '<span class="gear-wait">（待验证）</span>' : '<span class="gear-ok">（已闭环）</span>') +
+      '</div>';
   }
 
   // ---------- 复盘页 ----------
@@ -697,7 +715,7 @@
               ? '<div class="muted small">验证结论：' + esc(action.verifyResult) + '</div>' +
                 '<div class="muted small">' + fmtTime(action.closedAt) + ' 闭环</div>'
               : '')
-          : '<button class="add-eq" data-act="edit-review">+ 锻造新装备</button>') + '</div></div>' +
+          : '<span class="muted small">还没有装备</span>') + '</div></div>' +
         '</div></div>';
     }
     h += '</div>';

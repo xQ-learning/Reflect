@@ -121,6 +121,22 @@ def run(d):
           not nav.get("hasSeed"), str(nav.get("hasSeed")))
     check("目标页列出过往目标", nav["cards"] >= 2, str(nav["cards"]))
     check("列表里不出现「复盘项目」字样", "复盘项目" not in nav["text"], "")
+    check("页面标题是「目标集」", "目标集" in nav["text"], nav["text"][:40])
+
+    card = d.execute("""
+      var c = document.querySelector('.proj-card');
+      if (!c) return {no: true};
+      return {text: c.textContent,
+              hasProgress: !!c.querySelector('.progress'),
+              hasKpi: !!c.querySelector('.kpi'),
+              hasGear: !!c.querySelector('.gear'),
+              hasBoom: c.textContent.indexOf('💥') >= 0,
+              hasFire: c.textContent.indexOf('🔥') >= 0};
+    """)
+    check("目标卡片没有进度条", not card.get("hasProgress"), str(card))
+    check("目标卡片有核心数据行", card.get("hasKpi"), str(card))
+    check("目标卡片有装备掉落行", card.get("hasGear"), str(card))
+    check("目标卡片带 💥 与 🔥", card.get("hasBoom") and card.get("hasFire"), str(card))
 
     # 点「复盘」页签 = 开一次新的复盘
     d.execute("document.querySelector('#tabbar .tab[data-tab=review]').click(); return true;")
@@ -173,7 +189,8 @@ def run(d):
               expLines: v.querySelectorAll('.exp-ln').length,
               hasGood: v.textContent.indexOf('🟢') >= 0,
               hasBad: v.textContent.indexOf('🔴') >= 0,
-              hasSlot: v.textContent.indexOf('+ 锻造新装备') >= 0,
+              hasSlot: v.textContent.indexOf('还没有装备') >= 0,
+              viewActs: v.querySelectorAll('[data-act]').length,
               hasExpect: v.textContent.indexOf('💡 预期') >= 0,
               hasReal: v.textContent.indexOf('⚠️ 现实') >= 0,
               hasGap: v.textContent.indexOf('🔴 差距') >= 0,
@@ -194,9 +211,10 @@ def run(d):
     check("点目标页卡片进入战报回放页", opened["hash"].startswith("#/view/"), opened["hash"])
     check("只有两个模块：预期 vs 现实 / 经验流",
           opened["mods"] == ["📦 预期 vs 现实", "📦 经验流"], str(opened["mods"]))
-    check("顶栏是 返回 / 战报回放 / 编辑+导出",
-          opened["barLeft"] == "返回" and "战报回放" in opened["barTitle"]
-          and opened["barEdit"] and opened["barExport"], str(opened))
+    check("顶栏是 < / 战报回放 / 编辑",
+          opened["barLeft"] == "<" and "战报回放" in opened["barTitle"]
+          and opened["barEdit"], str(opened))
+    check("战报回放顶栏没有下载按钮", not opened["barExport"], str(opened))
     check("模块一含 预期/现实/差距",
           opened["hasExpect"] and opened["hasReal"] and opened["hasGap"], str(opened))
     check("表格已去掉", not opened["hasTable"], str(opened))
@@ -204,7 +222,9 @@ def run(d):
     check("每条事实带原因与装备两行",
           opened["items"] > 0 and opened["expLines"] == opened["items"] * 2, str(opened))
     check("事实有正负标记", opened["hasGood"] and opened["hasBad"], str(opened))
-    check("没改进的地方留了空位", opened["hasSlot"], str(opened))
+    check("没改进的地方留了只读空位", opened["hasSlot"], str(opened))
+    check("战报回放页内容里没有任何可点的操作",
+          opened["viewActs"] == 0, str(opened["viewActs"]))
     check("战报回放页完全只读，没有输入框和写操作",
           not opened["editable"], str(opened))
     check("战报回放页铺满到底，导航栏不占位",
