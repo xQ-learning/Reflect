@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="ReflectTheme" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0A0C10</item>
-        <item name="android:colorAccent">#C9A86A</item>
-        <item name="android:navigationBarColor">#0A0C10</item>
-        <item name="android:statusBarColor">#0A0C10</item>
+        <item name="android:windowBackground">#080A10</item>
+        <item name="android:colorAccent">#7FE3F2</item>
+        <item name="android:navigationBarColor">#080A10</item>
+        <item name="android:statusBarColor">#080A10</item>
     </style>
 </resources>
