@@ -108,7 +108,7 @@
 - **`store.persist()` 用 try/catch 吞掉了 `ui.render()` 的异常**：前端 JS 一报错，页面就「静默不更新」，控制台也不报错。排查时先手动调 `Reflect.ui.render()` 看是否抛错
 - 往 `/mnt/hgfs/app/` 覆盖**已存在**的文件会被安全分类器判为「Irreversible Local Destruction」拦下来 —— 所以每版都写新的带版本号文件名，用户也明确要求不覆盖 `reflect.apk`
 - 本机 Firefox 是 snap 包，受 confinement 限制读不到 `/tmp`，测试要在仓库目录或 `~` 下跑
-- 本机没有模拟器（无 KVM）也没有真机，APK 从未在设备上跑过；原生壳部分（WebView 承载、导出文件、分享）只做了静态验证
+- 本机没有 Android 模拟器（无 KVM）；Android 版**已在真机上验证过**（导出 / 分享 / 情绪一致性均正常）
 
 ---
 
@@ -323,8 +323,9 @@ python3 tools/layout_check.py       # 移动端布局体检（53 项）
 
 截图落在 `build/shots/`。
 
-**本机没有 Android 模拟器（无 KVM）也没有连接真机**，所以 APK 未在设备上跑过。
-UI 逻辑与布局由上述浏览器测试覆盖，原生壳部分（WebView 承载、导出文件、分享）只做了静态验证 —— 装到手机上后建议实际走一遍导出和分享。
+**本机没有 Android 模拟器（无 KVM）**，UI 逻辑与布局由上述浏览器测试覆盖。
+Android 版**已在真机上验证过**（导出文件 / 分享 / 情绪一致性均正常）。
+原生壳（WebView 承载、导出文件、分享）此前只做过静态验证，真机验证已补上。
 
 ---
 
